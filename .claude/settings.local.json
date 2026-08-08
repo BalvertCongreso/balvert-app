@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm -v)",
+      "Bash(sw_vers)",
+      "Bash(xcode-select -p)",
+      "Read(//Applications/**)",
+      "Bash(curl -s https://nodejs.org/dist/index.json)",
+      "Bash(python3 -c ' *)",
+      "Bash(mkdir -p /Users/macdeariadna/.balvert-tools)",
+      "Read(//Users/macdeariadna/**)",
+      "Bash(curl -# -L -o node.tar.gz https://nodejs.org/dist/v24.19.0/node-v24.19.0-darwin-arm64.tar.gz)",
+      "Bash(tar -xzf node.tar.gz)",
+      "Bash(mv node-v24.19.0-darwin-arm64 node)",
+      "Bash(mkdir -p /usr/local/bin 2>&1 && echo OK || echo FAIL)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} in %{time_total}s\\\\n\" --max-time 60 http://localhost:3000/patrocinadores/nuevo)",
+      "Bash(curl -s -o /tmp/nuevo.html -w \"%{http_code} in %{time_total}s\\\\n\" --max-time 180 http://localhost:3000/patrocinadores/nuevo)",
+      "Read(//tmp/**)",
+      "Bash(mkdir -p /Users/macdeariadna/.balvert-tools/next-build)",
+      "Bash(ln -s /Users/macdeariadna/.balvert-tools/next-build .next)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} in %{time_total}s\\\\n\" --max-time 30 http://localhost:3000/)",
+      "Bash(sample 13537 3 -f /tmp/sample_next.txt)",
+      "Bash(awk '/DispatchQueue_1: com.apple.main-thread/{flag=1} flag{print} flag && /^\\\\s*$/{exit}' /tmp/sample_next.txt)",
+      "Bash(ps -o pid,etime,time,stat -p 13537)"
+    ]
+  }
+}

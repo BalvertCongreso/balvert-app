@@ -1,0 +1,64 @@
+@import "tailwindcss" source(none);
+@source "../**/*.{ts,tsx}";
+
+:root {
+  --background: #ffffff;
+  --foreground: #1c1c1c;
+  --balvert-azul: #5bb8e8;
+  --balvert-azul-oscuro: #2f7ea8;
+  --balvert-marron: #8b6914;
+  --balvert-marron-claro: #c9a13b;
+  --borde: #e2e8f0;
+  --panel: #ffffff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-balvert-azul: var(--balvert-azul);
+  --color-balvert-azul-oscuro: var(--balvert-azul-oscuro);
+  --color-balvert-marron: var(--balvert-marron);
+  --color-balvert-marron-claro: var(--balvert-marron-claro);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.campo-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #52525b;
+  margin-bottom: 0.25rem;
+}
+
+.campo-input {
+  width: 100%;
+  border: 1px solid var(--borde);
+  border-radius: 0.375rem;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.9rem;
+  background: #fff;
+}
+
+.campo-input:focus {
+  outline: 2px solid var(--balvert-azul);
+  outline-offset: 1px;
+  border-color: var(--balvert-azul);
+}
+
+.seccion-titulo {
+  color: var(--balvert-marron);
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 2px solid var(--balvert-azul);
+  padding-bottom: 0.35rem;
+  margin-bottom: 1rem;
+}
