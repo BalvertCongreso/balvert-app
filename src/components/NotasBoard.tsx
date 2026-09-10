@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { useCurrentUser } from "@/context/CurrentUserContext";
+import { useAuth } from "@/context/AuthContext";
 
 interface NotaBase {
   id: string;
@@ -37,7 +37,7 @@ export default function NotasBoard({
   titulo,
   descripcion,
 }: Props) {
-  const { usuario } = useCurrentUser();
+  const { usuario } = useAuth();
   const [notas, setNotas] = useState<NotaBase[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -130,8 +130,8 @@ export default function NotasBoard({
 
       {!usuario && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          Elige quién eres arriba a la derecha ("Ariadna" o "Ariosto") para poder ver y
-          escribir notas.
+          Esta cuenta no está reconocida como Ariadna ni Ariosto, así que no se pueden
+          ver ni escribir notas. Contacta con quien gestiona la app.
         </div>
       )}
 

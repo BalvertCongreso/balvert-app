@@ -5,10 +5,33 @@
 create extension if not exists "pgcrypto";
 
 -- =========================================================
+-- 0. EDICIONES (multi-edición: la app se reutiliza cada año)
+-- =========================================================
+create table if not exists ediciones (
+  id uuid primary key default gen_random_uuid(),
+  nombre text,
+  anio integer,
+  fecha_inicio date,
+  fecha_fin date,
+  ciudad text,
+  activa boolean not null default false,
+
+  -- Fase 2B: lugar y horario propios de cada evento (no comparten sede).
+  -- Vacíos hasta que se cierren; mientras tanto la entrada muestra "Por confirmar".
+  lugar_congreso text,
+  fecha_hora_congreso timestamp,
+  lugar_gala text,
+  fecha_hora_gala timestamp,
+  lugar_excursion text,
+  fecha_hora_excursion timestamp
+);
+
+-- =========================================================
 -- 1. PATROCINADORES (45 campos, pestaña 🏆 PATROCINADORES)
 -- =========================================================
 create table if not exists patrocinadores (
   id uuid primary key default gen_random_uuid(),
+  edicion_id uuid references ediciones(id),
 
   -- Identificación
   categoria text check (categoria in ('💎 DIAMANTE','⭐ ORO','🥈 PLATA','🏛 INSTITUCIONAL','Personalizado')),
@@ -83,6 +106,7 @@ comment on column patrocinadores.referencia_pago_online is 'Reservado Fase 7 (id
 -- =========================================================
 create table if not exists gala (
   id uuid primary key default gen_random_uuid(),
+  edicion_id uuid references ediciones(id),
   empresa_entidad uuid references patrocinadores(id) on delete set null,
   categoria_patrocinio text,
   nombre_asistente text,
@@ -98,25 +122,79 @@ create table if not exists gala (
   observaciones text,
   -- Reservado para Fase 7
   metodo_pago text check (metodo_pago in ('Transferencia','Pasarela online','Otro')),
-  referencia_pago_online text
+  referencia_pago_online text,
+  -- Fase 2B: identificador único del QR de la entrada, para validar en el check-in (Fase 3).
+  qr_codigo text unique,
+  -- Fase 3: si esta entrada ya se validó físicamente en la puerta, y cuándo.
+  check_in_hecho text check (check_in_hecho in ('Sí','No')) default 'No',
+  check_in_fecha timestamptz
+);
+
+-- =========================================================
+-- 2B. ASISTENTES_CONGRESO (NUEVO — Fase 2A, no existía en el Excel ni en Berrly)
+-- Un registro por persona física que asiste al congreso (independiente,
+-- invitado por patrocinio, o contacto de empresa patrocinadora).
+-- =========================================================
+create table if not exists asistentes_congreso (
+  id uuid primary key default gen_random_uuid(),
+  edicion_id uuid references ediciones(id),
+  -- Nullable a propósito: las "invitaciones vacías" que crea Patrocinadores
+  -- son plazas reservadas sin nombre todavía (se rellena más adelante).
+  nombre text,
+  email text,
+  telefono text,
+  cargo text,
+  empresa_entidad uuid references patrocinadores(id) on delete set null,
+  categoria_patrocinio text,
+  tipo_acceso text check (tipo_acceso in ('Independiente','Invitado por patrocinio','Contacto de empresa patrocinadora')),
+  menu text check (menu in ('Carne','Pescado','Vegetariano','Vegano')),
+  -- Dato sensible (salud, RGPD categoría especial): tratar con cuidado, no exportar sin necesidad.
+  alergias_intolerancias text,
+  confirmado text check (confirmado in ('Sí','No','Pendiente')),
+  entrada_enviada text check (entrada_enviada in ('Sí','No')),
+  precio numeric(10,2),
+  -- Reservado para Fase 7
+  metodo_pago text check (metodo_pago in ('Transferencia','Pasarela online','Otro')),
+  referencia_pago_online text,
+  observaciones text,
+  -- Fase 2B: identificador único del QR de la entrada, para validar en el check-in (Fase 3).
+  qr_codigo text unique,
+  -- Fase 3: si esta entrada ya se validó físicamente en la puerta, y cuándo.
+  check_in_hecho text check (check_in_hecho in ('Sí','No')) default 'No',
+  check_in_fecha timestamptz,
+  -- Fase 2C-ii: como mucho una fila por email dentro de la misma edición
+  -- (evita duplicados del formulario público). Los email nulos —invitaciones
+  -- vacías creadas desde Patrocinadores— no cuentan como duplicados entre sí.
+  unique (email, edicion_id)
 );
 
 -- =========================================================
 -- 3. EXCURSIÓN (pestaña 🚌 EXCURSIÓN) — un registro por persona asistente
+-- Nota: email_asistente y entrada_enviada NO estaban en el Excel original;
+-- se añadieron en Fase 2B (con aprobación de Ariadna) para poder mandar la
+-- entrada QR por email igual que en Congreso y Gala.
 -- =========================================================
 create table if not exists excursion (
   id uuid primary key default gen_random_uuid(),
+  edicion_id uuid references ediciones(id),
   empresa_entidad uuid references patrocinadores(id) on delete set null,
   categoria_patrocinio text,
   nombre_asistente text,
+  email_asistente text,
   cargo text,
   tipo_entrada text check (tipo_entrada in ('Incluida en patrocinio','Comprada (10€)','Invitación organización')),
   confirmado text check (confirmado in ('Sí','No','Pendiente')),
+  entrada_enviada text check (entrada_enviada in ('Sí','No')),
   precio numeric(10,2),
   observaciones text,
   -- Reservado para Fase 7
   metodo_pago text check (metodo_pago in ('Transferencia','Pasarela online','Otro')),
-  referencia_pago_online text
+  referencia_pago_online text,
+  -- Fase 2B: identificador único del QR de la entrada, para validar en el check-in (Fase 3).
+  qr_codigo text unique,
+  -- Fase 3: si esta entrada ya se validó físicamente en la puerta, y cuándo.
+  check_in_hecho text check (check_in_hecho in ('Sí','No')) default 'No',
+  check_in_fecha timestamptz
 );
 
 -- =========================================================
@@ -124,6 +202,7 @@ create table if not exists excursion (
 -- =========================================================
 create table if not exists tareas (
   id uuid primary key default gen_random_uuid(),
+  edicion_id uuid references ediciones(id),
   responsable text check (responsable in ('🔴 Ariosto','🟣 Ariadna','🤝 Ambos')),
   tarea text,
   entidad_relacionada uuid references patrocinadores(id) on delete set null,
@@ -133,6 +212,54 @@ create table if not exists tareas (
   estado text check (estado in ('⏳ Pendiente','🔄 En curso','✅ Completada','❌ Cancelada')),
   fecha_completada date,
   notas text
+);
+
+-- =========================================================
+-- 4B. PROVEEDORES (NUEVO — Fase 1B, control de gasto/coste)
+-- Lo contrario de PATROCINADORES: aquí pagamos nosotros, no nos pagan a nosotros.
+-- =========================================================
+create table if not exists proveedores (
+  id uuid primary key default gen_random_uuid(),
+  edicion_id uuid references ediciones(id),
+
+  -- Identificación y contacto
+  nombre_proveedor text,
+  servicio_prestado text,
+  persona_contacto text,
+  email_contacto text,
+  telefono_contacto text,
+
+  -- Evento
+  evento_vinculado text check (evento_vinculado in ('Congreso','Gala','Excursión','General/Todo el evento')),
+
+  -- Coste y facturación
+  coste_acordado numeric(10,2),
+  coste_real_pagado numeric(10,2),
+  numero_factura text,
+  factura_recibida text check (factura_recibida in ('Sí','No')),
+  fecha_recepcion_factura date,
+  factura_pagada text check (factura_pagada in ('Sí','No')),
+  fecha_pago date,
+  forma_pago text check (forma_pago in ('Transferencia','Otro')),
+
+  -- Condiciones y notas
+  condiciones_servicio text,
+  observaciones text
+);
+
+-- =========================================================
+-- 4C. CONTACTOS_NEWSLETTER (NUEVO — Fase 4, boletines por email)
+-- Lista general de contactos (ponentes, prensa, interesados...), sin
+-- edicion_id a propósito: no está ligada a una edición ni a un patrocinador.
+-- =========================================================
+create table if not exists contactos_newsletter (
+  id uuid primary key default gen_random_uuid(),
+  nombre text,
+  apellidos text,
+  email text unique,
+  telefono text,
+  origen_lista text,
+  fecha_alta timestamptz default now()
 );
 
 -- =========================================================
@@ -169,24 +296,92 @@ create table if not exists notas_privadas (
 );
 
 -- =========================================================
--- Seguridad (RLS)
--- Fase 1: sin login, Ariadna y Ariosto usan la misma clave pública (anon)
--- de la app y tienen acceso completo por decisión de producto.
--- El filtrado de "Mis notas" lo aplica la propia app (no es una barrera
--- de seguridad todavía), tal como se acordó para esta fase.
+-- 8. PROSPECTOS_PATROCINIO (Fase 6c — Captación, embudo de patrocinadores potenciales)
+-- Distinto de PATROCINADORES: aquí son empresas/entidades a las que se está
+-- intentando captar, todavía sin confirmar. La conversión a Patrocinadores
+-- es manual (Ariadna/Ariosto crean la ficha ellos mismos), nunca automática.
 -- =========================================================
+create table if not exists prospectos_patrocinio (
+  id uuid primary key default gen_random_uuid(),
+  edicion_id uuid references ediciones(id),
+  empresa_entidad text,
+  contacto_nombre text,
+  contacto_cargo text,
+  contacto_email text,
+  contacto_telefono text,
+  interes text check (interes in ('Sin contactar','Contactado','Interesado','En negociación','No interesado','Convertido en patrocinador')),
+  responsable text check (responsable in ('🔴 Ariosto','🟣 Ariadna','🤝 Ambos')),
+  observaciones text
+);
+
+-- =========================================================
+-- 9. PROSPECTOS_CONTACTOS (historial de contactos por prospecto, mismo patrón que tarea_comentarios)
+-- =========================================================
+create table if not exists prospectos_contactos (
+  id uuid primary key default gen_random_uuid(),
+  prospecto_id uuid references prospectos_patrocinio(id) on delete cascade,
+  fecha timestamptz default now(),
+  autor text check (autor in ('Ariosto','Ariadna')),
+  comentario text
+);
+
+-- =========================================================
+-- Seguridad (RLS)
+-- Login real con Supabase Auth (desde antes de la Fase 2C): todas las
+-- tablas internas exigen sesión iniciada (auth.uid() is not null), ya no
+-- basta con tener la clave pública "anon" de la app.
+-- El filtrado de "Mis notas" lo sigue aplicando también la propia app
+-- (a qué usuario le pertenece cada nota), esto solo exige estar logueado.
+-- =========================================================
+alter table ediciones enable row level security;
 alter table patrocinadores enable row level security;
 alter table gala enable row level security;
 alter table excursion enable row level security;
 alter table tareas enable row level security;
+alter table proveedores enable row level security;
+alter table asistentes_congreso enable row level security;
 alter table tarea_comentarios enable row level security;
 alter table notas_compartidas enable row level security;
 alter table notas_privadas enable row level security;
+alter table contactos_newsletter enable row level security;
+alter table prospectos_patrocinio enable row level security;
+alter table prospectos_contactos enable row level security;
 
-create policy "acceso completo patrocinadores" on patrocinadores for all using (true) with check (true);
-create policy "acceso completo gala" on gala for all using (true) with check (true);
-create policy "acceso completo excursion" on excursion for all using (true) with check (true);
-create policy "acceso completo tareas" on tareas for all using (true) with check (true);
-create policy "acceso completo tarea_comentarios" on tarea_comentarios for all using (true) with check (true);
-create policy "acceso completo notas_compartidas" on notas_compartidas for all using (true) with check (true);
-create policy "acceso completo notas_privadas" on notas_privadas for all using (true) with check (true);
+create policy "solo con sesión ediciones" on ediciones for all using (auth.uid() is not null) with check (auth.uid() is not null);
+create policy "solo con sesión contactos_newsletter" on contactos_newsletter for all using (auth.uid() is not null) with check (auth.uid() is not null);
+create policy "solo con sesión patrocinadores" on patrocinadores for all using (auth.uid() is not null) with check (auth.uid() is not null);
+create policy "solo con sesión gala" on gala for all using (auth.uid() is not null) with check (auth.uid() is not null);
+create policy "solo con sesión excursion" on excursion for all using (auth.uid() is not null) with check (auth.uid() is not null);
+create policy "solo con sesión tareas" on tareas for all using (auth.uid() is not null) with check (auth.uid() is not null);
+create policy "solo con sesión proveedores" on proveedores for all using (auth.uid() is not null) with check (auth.uid() is not null);
+create policy "solo con sesión asistentes_congreso" on asistentes_congreso for all using (auth.uid() is not null) with check (auth.uid() is not null);
+create policy "solo con sesión tarea_comentarios" on tarea_comentarios for all using (auth.uid() is not null) with check (auth.uid() is not null);
+create policy "solo con sesión notas_compartidas" on notas_compartidas for all using (auth.uid() is not null) with check (auth.uid() is not null);
+create policy "solo con sesión notas_privadas" on notas_privadas for all using (auth.uid() is not null) with check (auth.uid() is not null);
+create policy "solo con sesión prospectos_patrocinio" on prospectos_patrocinio for all using (auth.uid() is not null) with check (auth.uid() is not null);
+create policy "solo con sesión prospectos_contactos" on prospectos_contactos for all using (auth.uid() is not null) with check (auth.uid() is not null);
+
+-- Permisos a nivel de base de datos: sin esto, la clave anon recibe
+-- "permission denied" aunque las políticas de arriba digan que sí se puede.
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on all tables in schema public to anon, authenticated;
+grant usage, select on all sequences in schema public to anon, authenticated;
+
+-- =========================================================
+-- Fase 2C-ii: formulario público de inscripción al Congreso.
+-- Se probó primero dando a "anon" permiso de INSERT/UPDATE limitado por RLS,
+-- pero se topó con un caso límite de Postgres en el que el UPDATE público no
+-- combinaba bien con la política "solo con sesión" (confirmado con pruebas
+-- diagnósticas: datos y permisos correctos, pero la fila no aparecía ni con
+-- las políticas aisladas). En su lugar, la ruta del formulario público
+-- (src/app/api/inscripcion-congreso) usa la clave "service_role" solo en el
+-- servidor —nunca en el navegador— y valida a mano, en el propio código, qué
+-- se puede guardar. Por eso `asistentes_congreso` y `ediciones` NO tienen
+-- ninguna política pública: siguen exigiendo sesión real en todo, como el
+-- resto de tablas.
+-- =========================================================
+-- Primera edición (para que la app tenga una edición activa desde el minuto uno)
+-- =========================================================
+insert into ediciones (nombre, anio, activa)
+select 'BALVERT 2027', 2027, true
+where not exists (select 1 from ediciones);

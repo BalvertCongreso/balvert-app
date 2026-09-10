@@ -1,20 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { obtenerEdicionActiva } from "@/lib/edicionActiva";
 import PatrocinadorForm from "@/components/PatrocinadorForm";
-import type { PatrocinadorInput } from "@/types/database";
+import type { Edicion, PatrocinadorInput } from "@/types/database";
 
 export default function NuevoPatrocinadorPage() {
   const router = useRouter();
+  const [edicion, setEdicion] = useState<Edicion | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    obtenerEdicionActiva().then(setEdicion);
+  }, []);
+
   async function guardar(datos: PatrocinadorInput) {
     setGuardando(true);
-    const { error } = await supabase.from("patrocinadores").insert(datos);
+    const { error } = await supabase
+      .from("patrocinadores")
+      .insert({ ...datos, edicion_id: edicion?.id ?? null });
     setGuardando(false);
     if (error) {
       setError(error.message);
@@ -35,6 +43,11 @@ export default function NuevoPatrocinadorPage() {
         <h1 className="mt-2 text-2xl font-bold text-[var(--balvert-marron)]">
           Nuevo patrocinador
         </h1>
+        {edicion?.nombre && (
+          <p className="mt-1 text-xs text-zinc-400">
+            Se guardará en la edición activa: {edicion.nombre}
+          </p>
+        )}
       </div>
 
       {error && (

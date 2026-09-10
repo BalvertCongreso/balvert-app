@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import PatrocinadorForm from "@/components/PatrocinadorForm";
+import CrearInvitaciones from "@/components/CrearInvitaciones";
 import type { Patrocinador, PatrocinadorInput } from "@/types/database";
 
 export default function EditarPatrocinadorPage() {
@@ -89,12 +90,20 @@ export default function EditarPatrocinadorPage() {
       {cargando && <p className="text-sm text-zinc-500">Cargando…</p>}
 
       {!cargando && patrocinador && (
-        <PatrocinadorForm
-          valoresPrevios={patrocinador as unknown as Record<string, string | number | null>}
-          guardando={guardando}
-          onGuardar={guardar}
-          textoBoton="Guardar cambios"
-        />
+        <>
+          <CrearInvitaciones
+            patrocinadorId={patrocinador.id}
+            edicionId={patrocinador.edicion_id}
+            categoria={patrocinador.categoria}
+            numInvitacionesIncluidas={patrocinador.num_invitaciones_incluidas}
+          />
+          <PatrocinadorForm
+            valoresPrevios={patrocinador as unknown as Record<string, string | number | null>}
+            guardando={guardando}
+            onGuardar={guardar}
+            textoBoton="Guardar cambios"
+          />
+        </>
       )}
     </div>
   );

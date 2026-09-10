@@ -3,19 +3,30 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
-import type { Patrocinador } from "@/types/database";
+import { obtenerEdicionActiva } from "@/lib/edicionActiva";
+import type { Edicion, Patrocinador } from "@/types/database";
 
 export default function PatrocinadoresPage() {
   const [patrocinadores, setPatrocinadores] = useState<Patrocinador[]>([]);
+  const [edicion, setEdicion] = useState<Edicion | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   async function cargar() {
     setCargando(true);
-    const { data, error } = await supabase
+    const edicionActiva = await obtenerEdicionActiva();
+    setEdicion(edicionActiva);
+
+    let query = supabase
       .from("patrocinadores")
       .select("*")
       .order("empresa_entidad", { ascending: true });
+
+    if (edicionActiva) {
+      query = query.eq("edicion_id", edicionActiva.id);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       setError(error.message);
@@ -53,6 +64,11 @@ export default function PatrocinadoresPage() {
           </h1>
           <p className="text-sm text-zinc-600">
             {cargando ? "Cargando…" : `${patrocinadores.length} patrocinador(es)`}
+            {edicion?.nombre && (
+              <span className="ml-2 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500">
+                Edición: {edicion.nombre}
+              </span>
+            )}
           </p>
         </div>
         <Link

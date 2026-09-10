@@ -1,4 +1,13 @@
-export type CampoTipo = "texto" | "texto-largo" | "numero" | "fecha" | "select" | "email" | "telefono";
+export type CampoTipo =
+  | "texto"
+  | "texto-largo"
+  | "numero"
+  | "fecha"
+  | "fecha-hora"
+  | "select"
+  | "email"
+  | "telefono"
+  | "booleano";
 
 export interface CampoDef {
   key: string;

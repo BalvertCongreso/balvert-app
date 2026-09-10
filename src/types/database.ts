@@ -12,8 +12,28 @@ export type Categoria =
 export type SiNo = "Sí" | "No";
 export type SiNoNA = "Sí" | "No" | "N/A";
 
+export interface Edicion {
+  id: string;
+  nombre: string | null;
+  anio: number | null;
+  fecha_inicio: string | null;
+  fecha_fin: string | null;
+  ciudad: string | null;
+  activa: boolean;
+
+  lugar_congreso: string | null;
+  fecha_hora_congreso: string | null;
+  lugar_gala: string | null;
+  fecha_hora_gala: string | null;
+  lugar_excursion: string | null;
+  fecha_hora_excursion: string | null;
+}
+
+export type EdicionInput = Omit<Edicion, "id">;
+
 export interface Patrocinador {
   id: string;
+  edicion_id: string | null;
 
   // Identificación
   categoria: Categoria | null;
@@ -79,6 +99,190 @@ export interface Patrocinador {
 }
 
 export type PatrocinadorInput = Omit<Patrocinador, "id">;
+
+export interface Proveedor {
+  id: string;
+  edicion_id: string | null;
+
+  // Identificación y contacto
+  nombre_proveedor: string | null;
+  servicio_prestado: string | null;
+  persona_contacto: string | null;
+  email_contacto: string | null;
+  telefono_contacto: string | null;
+
+  // Evento
+  evento_vinculado: "Congreso" | "Gala" | "Excursión" | "General/Todo el evento" | null;
+
+  // Coste y facturación
+  coste_acordado: number | null;
+  coste_real_pagado: number | null;
+  numero_factura: string | null;
+  factura_recibida: SiNo | null;
+  fecha_recepcion_factura: string | null;
+  factura_pagada: SiNo | null;
+  fecha_pago: string | null;
+  forma_pago: "Transferencia" | "Otro" | null;
+
+  // Condiciones y notas
+  condiciones_servicio: string | null;
+  observaciones: string | null;
+}
+
+export type ProveedorInput = Omit<Proveedor, "id">;
+
+export interface AsistenteCongreso {
+  id: string;
+  edicion_id: string | null;
+  nombre: string | null;
+  email: string | null;
+  telefono: string | null;
+  cargo: string | null;
+  empresa_entidad: string | null;
+  categoria_patrocinio: string | null;
+  tipo_acceso:
+    | "Independiente"
+    | "Invitado por patrocinio"
+    | "Contacto de empresa patrocinadora"
+    | null;
+  menu: "Carne" | "Pescado" | "Vegetariano" | "Vegano" | null;
+  alergias_intolerancias: string | null;
+  confirmado: "Sí" | "No" | "Pendiente" | null;
+  entrada_enviada: SiNo | null;
+  precio: number | null;
+  metodo_pago: "Transferencia" | "Pasarela online" | "Otro" | null;
+  referencia_pago_online: string | null;
+  observaciones: string | null;
+  qr_codigo: string | null;
+  check_in_hecho: SiNo | null;
+  check_in_fecha: string | null;
+}
+
+export type AsistenteCongresoInput = Omit<AsistenteCongreso, "id">;
+
+export interface Gala {
+  id: string;
+  edicion_id: string | null;
+  empresa_entidad: string | null;
+  categoria_patrocinio: string | null;
+  nombre_asistente: string | null;
+  email_asistente: string | null;
+  cargo: string | null;
+  tipo_entrada: "Incluida en patrocinio" | "Comprada" | "Invitación organización" | null;
+  menu: "Carne" | "Pescado" | "Vegetariano" | "Vegano" | null;
+  alergias_intolerancias: string | null;
+  confirmado: "Sí" | "No" | "Pendiente" | null;
+  entrada_enviada: SiNo | null;
+  precio_entrada: number | null;
+  observaciones: string | null;
+  metodo_pago: "Transferencia" | "Pasarela online" | "Otro" | null;
+  referencia_pago_online: string | null;
+  qr_codigo: string | null;
+  check_in_hecho: SiNo | null;
+  check_in_fecha: string | null;
+}
+
+export type GalaInput = Omit<Gala, "id">;
+
+export interface Excursion {
+  id: string;
+  edicion_id: string | null;
+  empresa_entidad: string | null;
+  categoria_patrocinio: string | null;
+  nombre_asistente: string | null;
+  email_asistente: string | null;
+  cargo: string | null;
+  tipo_entrada:
+    | "Incluida en patrocinio"
+    | "Comprada (10€)"
+    | "Invitación organización"
+    | null;
+  confirmado: "Sí" | "No" | "Pendiente" | null;
+  entrada_enviada: SiNo | null;
+  precio: number | null;
+  observaciones: string | null;
+  metodo_pago: "Transferencia" | "Pasarela online" | "Otro" | null;
+  referencia_pago_online: string | null;
+  qr_codigo: string | null;
+  check_in_hecho: SiNo | null;
+  check_in_fecha: string | null;
+}
+
+export type ExcursionInput = Omit<Excursion, "id">;
+
+export interface ContactoNewsletter {
+  id: string;
+  nombre: string | null;
+  apellidos: string | null;
+  email: string | null;
+  telefono: string | null;
+  origen_lista: string | null;
+  fecha_alta: string;
+}
+
+export type ContactoNewsletterInput = Omit<ContactoNewsletter, "id" | "fecha_alta">;
+
+export interface Tarea {
+  id: string;
+  edicion_id: string | null;
+  responsable: "🔴 Ariosto" | "🟣 Ariadna" | "🤝 Ambos" | null;
+  tarea: string | null;
+  entidad_relacionada: string | null;
+  fase:
+    | "Fase 0 - Cierre 2026"
+    | "Fase 1 - Jul/Ago 2026"
+    | "Fase 2 - Sep/Nov 2026"
+    | "Fase 3 - Dic 2026/Ene 2027"
+    | "Fase 4 - Feb 2027"
+    | "Fase 5 - Congreso"
+    | "General"
+    | null;
+  prioridad: "🔴 Alta" | "🟡 Media" | "🟢 Baja" | null;
+  fecha_limite: string | null;
+  estado: "⏳ Pendiente" | "🔄 En curso" | "✅ Completada" | "❌ Cancelada" | null;
+  fecha_completada: string | null;
+  notas: string | null;
+}
+
+export interface TareaComentario {
+  id: string;
+  tarea_id: string;
+  autor: Usuario | null;
+  contenido: string | null;
+  fecha_creacion: string;
+}
+
+export type TareaInput = Omit<Tarea, "id">;
+
+export interface ProspectoPatrocinio {
+  id: string;
+  edicion_id: string | null;
+  empresa_entidad: string | null;
+  contacto_nombre: string | null;
+  contacto_cargo: string | null;
+  contacto_email: string | null;
+  contacto_telefono: string | null;
+  interes:
+    | "Sin contactar"
+    | "Contactado"
+    | "Interesado"
+    | "En negociación"
+    | "No interesado"
+    | "Convertido en patrocinador"
+    | null;
+  responsable: "🔴 Ariosto" | "🟣 Ariadna" | "🤝 Ambos" | null;
+  observaciones: string | null;
+}
+
+export type ProspectoPatrocinioInput = Omit<ProspectoPatrocinio, "id">;
+
+export interface ProspectoContacto {
+  id: string;
+  prospecto_id: string;
+  fecha: string;
+  autor: Usuario | null;
+  comentario: string | null;
+}
 
 export interface NotaCompartida {
   id: string;

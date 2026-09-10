@@ -2,22 +2,33 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCurrentUser } from "@/context/CurrentUserContext";
+import CuentaMenu from "@/components/CuentaMenu";
 
 const enlaces = [
+  { href: "/", label: "Inicio" },
+  { href: "/ediciones", label: "Ediciones" },
   { href: "/patrocinadores", label: "Patrocinadores" },
+  { href: "/proveedores", label: "Proveedores" },
+  { href: "/congreso", label: "Congreso" },
+  { href: "/programa", label: "Programa" },
+  { href: "/gala", label: "Gala" },
+  { href: "/excursion", label: "Excursión" },
+  { href: "/check-in", label: "Check-in" },
+  { href: "/tareas", label: "Tareas" },
+  { href: "/captacion", label: "Captación" },
+  { href: "/contactos", label: "Contactos" },
+  { href: "/newsletter", label: "Newsletter" },
   { href: "/notas-equipo", label: "Notas del equipo" },
   { href: "/mis-notas", label: "Mis notas" },
 ];
 
 export default function NavHeader() {
   const pathname = usePathname();
-  const { usuario, setUsuario } = useCurrentUser();
 
   return (
     <header className="border-b border-[var(--borde)] bg-white">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
-        <div className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-3">
           <div
             className="flex h-9 w-9 items-center justify-center rounded-md text-sm font-bold text-white"
             style={{
@@ -35,11 +46,14 @@ export default function NavHeader() {
               Panel de gestión del congreso
             </p>
           </div>
-        </div>
+        </Link>
 
-        <nav className="flex items-center gap-1">
+        <nav className="flex flex-wrap items-center gap-1">
           {enlaces.map((enlace) => {
-            const activo = pathname?.startsWith(enlace.href);
+            const activo =
+              enlace.href === "/"
+                ? pathname === "/"
+                : pathname?.startsWith(enlace.href);
             return (
               <Link
                 key={enlace.href}
@@ -56,20 +70,7 @@ export default function NavHeader() {
           })}
         </nav>
 
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-zinc-500">Estás viendo la app como:</span>
-          <select
-            className="campo-input !w-auto"
-            value={usuario ?? ""}
-            onChange={(e) => setUsuario(e.target.value as "Ariadna" | "Ariosto")}
-          >
-            <option value="" disabled>
-              Elige quién eres
-            </option>
-            <option value="Ariadna">Ariadna</option>
-            <option value="Ariosto">Ariosto</option>
-          </select>
-        </div>
+        <CuentaMenu />
       </div>
     </header>
   );
