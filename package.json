@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@supabase/supabase-js": "^2.112.2",
     "@tiptap/extension-color": "^3.29.2",
     "@tiptap/extension-font-family": "^3.29.2",
