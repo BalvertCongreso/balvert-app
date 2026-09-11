@@ -8,7 +8,7 @@ function valoresIniciales(): Record<string, string> {
   const valores: Record<string, string> = {};
   for (const seccion of seccionesProspecto) {
     for (const campo of seccion.campos) {
-      valores[campo.key] = "";
+      valores[campo.key] = campo.tipo === "booleano" ? "false" : "";
     }
   }
   return valores;
@@ -44,9 +44,12 @@ export default function ProspectoForm({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const datos: Record<string, string | number | null> = {};
-    for (const [key, value] of Object.entries(valores)) {
-      datos[key] = value === "" ? null : value;
+    const datos: Record<string, string | boolean | number | null> = {};
+    for (const seccion of seccionesProspecto) {
+      for (const campo of seccion.campos) {
+        const value = valores[campo.key];
+        datos[campo.key] = campo.tipo === "booleano" ? value === "true" : value === "" ? null : value;
+      }
     }
     onGuardar(datos as unknown as ProspectoPatrocinioInput);
   }
@@ -79,6 +82,14 @@ export default function ProspectoForm({
                       </option>
                     ))}
                   </select>
+                ) : campo.tipo === "booleano" ? (
+                  <input
+                    id={campo.key}
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={valores[campo.key] === "true"}
+                    onChange={(e) => actualizar(campo.key, e.target.checked ? "true" : "false")}
+                  />
                 ) : campo.tipo === "texto-largo" ? (
                   <textarea
                     id={campo.key}

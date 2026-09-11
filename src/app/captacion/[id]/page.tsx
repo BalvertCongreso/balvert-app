@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { sincronizarContactoDesdeProspecto } from "@/lib/sincronizarContacto";
 import ProspectoForm from "@/components/ProspectoForm";
 import ProspectoContactos from "@/components/ProspectoContactos";
 import type { ProspectoPatrocinio, ProspectoPatrocinioInput } from "@/types/database";
@@ -41,12 +42,14 @@ export default function EditarProspectoPage() {
       setError(error.message);
       return;
     }
+    await sincronizarContactoDesdeProspecto(datos);
     router.push("/captacion");
   }
 
   async function eliminar() {
+    const nombre = prospecto?.empresa || prospecto?.entidad_publica;
     const ok = window.confirm(
-      `¿Eliminar el prospecto "${prospecto?.empresa_entidad ?? "este prospecto"}"? Esta acción no se puede deshacer.`
+      `¿Eliminar el prospecto "${nombre ?? "este prospecto"}"? Esta acción no se puede deshacer.`
     );
     if (!ok) return;
     const { error } = await supabase.from("prospectos_patrocinio").delete().eq("id", id);
@@ -68,7 +71,7 @@ export default function EditarProspectoPage() {
             ← Volver al listado
           </Link>
           <h1 className="mt-2 text-2xl font-bold text-[var(--balvert-marron)]">
-            {prospecto?.empresa_entidad || "Editar prospecto"}
+            {prospecto?.empresa || prospecto?.entidad_publica || "Editar prospecto"}
           </h1>
         </div>
         {prospecto && (

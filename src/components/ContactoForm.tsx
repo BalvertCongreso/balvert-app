@@ -8,7 +8,7 @@ function valoresIniciales(): Record<string, string> {
   const valores: Record<string, string> = {};
   for (const seccion of seccionesContacto) {
     for (const campo of seccion.campos) {
-      valores[campo.key] = "";
+      valores[campo.key] = campo.tipo === "booleano" ? "false" : "";
     }
   }
   return valores;
@@ -44,9 +44,12 @@ export default function ContactoForm({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const datos: Record<string, string | null> = {};
-    for (const [key, value] of Object.entries(valores)) {
-      datos[key] = value === "" ? null : value;
+    const datos: Record<string, string | boolean | null> = {};
+    for (const seccion of seccionesContacto) {
+      for (const campo of seccion.campos) {
+        const value = valores[campo.key];
+        datos[campo.key] = campo.tipo === "booleano" ? value === "true" : value === "" ? null : value;
+      }
     }
     onGuardar(datos as unknown as ContactoNewsletterInput);
   }
@@ -62,19 +65,29 @@ export default function ContactoForm({
                 <label className="campo-label" htmlFor={campo.key}>
                   {campo.label}
                 </label>
-                <input
-                  id={campo.key}
-                  className="campo-input"
-                  type={
-                    campo.tipo === "email"
-                      ? "email"
-                      : campo.tipo === "telefono"
-                      ? "tel"
-                      : "text"
-                  }
-                  value={valores[campo.key]}
-                  onChange={(e) => actualizar(campo.key, e.target.value)}
-                />
+                {campo.tipo === "booleano" ? (
+                  <input
+                    id={campo.key}
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={valores[campo.key] === "true"}
+                    onChange={(e) => actualizar(campo.key, e.target.checked ? "true" : "false")}
+                  />
+                ) : (
+                  <input
+                    id={campo.key}
+                    className="campo-input"
+                    type={
+                      campo.tipo === "email"
+                        ? "email"
+                        : campo.tipo === "telefono"
+                        ? "tel"
+                        : "text"
+                    }
+                    value={valores[campo.key]}
+                    onChange={(e) => actualizar(campo.key, e.target.value)}
+                  />
+                )}
                 {campo.nota && (
                   <p className="mt-1 text-xs italic text-zinc-400">{campo.nota}</p>
                 )}

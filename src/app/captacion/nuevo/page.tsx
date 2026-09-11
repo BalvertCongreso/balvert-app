@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { obtenerEdicionActiva } from "@/lib/edicionActiva";
+import { sincronizarContactoDesdeProspecto } from "@/lib/sincronizarContacto";
 import ProspectoForm from "@/components/ProspectoForm";
 import type { Edicion, ProspectoPatrocinioInput } from "@/types/database";
 
@@ -28,6 +29,7 @@ export default function NuevoProspectoPage() {
       setError(error.message);
       return;
     }
+    await sincronizarContactoDesdeProspecto(datos);
     router.push("/captacion");
   }
 

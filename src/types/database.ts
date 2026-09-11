@@ -217,6 +217,10 @@ export interface ContactoNewsletter {
   email: string | null;
   telefono: string | null;
   origen_lista: string | null;
+  empresa: string | null;
+  entidad_publica: string | null;
+  colegiado_profesional: boolean;
+  nombre_colegio: string | null;
   fecha_alta: string;
 }
 
@@ -258,6 +262,10 @@ export interface ProspectoPatrocinio {
   id: string;
   edicion_id: string | null;
   empresa_entidad: string | null;
+  empresa: string | null;
+  entidad_publica: string | null;
+  colegiado_profesional: boolean;
+  nombre_colegio: string | null;
   contacto_nombre: string | null;
   contacto_cargo: string | null;
   contacto_email: string | null;

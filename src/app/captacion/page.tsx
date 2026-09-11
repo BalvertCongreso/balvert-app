@@ -50,7 +50,8 @@ export default function CaptacionPage() {
     let query = supabase
       .from("prospectos_patrocinio")
       .select("*")
-      .order("empresa_entidad", { ascending: true });
+      .order("empresa", { ascending: true, nullsFirst: false })
+      .order("entidad_publica", { ascending: true, nullsFirst: false });
 
     if (edicionActiva) {
       query = query.eq("edicion_id", edicionActiva.id);
@@ -133,11 +134,12 @@ export default function CaptacionPage() {
               {prospectos.map((p) => {
                 const expandida = expandidaId === p.id;
                 const resumen = resumenContactos[p.id];
+                const nombre = p.empresa || p.entidad_publica;
                 return (
                   <Fragment key={p.id}>
                     <tr className="border-t border-[var(--borde)]">
                       <td className="px-4 py-3 font-medium">
-                        {p.empresa_entidad ?? "(sin nombre)"}
+                        {nombre ?? "(sin nombre)"}
                       </td>
                       <td className="px-4 py-3">{p.responsable ?? "—"}</td>
                       <td className="px-4 py-3">{p.interes ?? "—"}</td>
@@ -160,7 +162,7 @@ export default function CaptacionPage() {
                           Editar
                         </Link>
                         <button
-                          onClick={() => eliminar(p.id, p.empresa_entidad)}
+                          onClick={() => eliminar(p.id, nombre)}
                           className="font-medium text-red-600 hover:underline"
                         >
                           Eliminar

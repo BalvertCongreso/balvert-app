@@ -16,4 +16,13 @@ export const seccionesContacto: SeccionDef[] = [
       },
     ],
   },
+  {
+    titulo: "Empresa / colegiación",
+    campos: [
+      { key: "empresa", label: "Empresa", tipo: "texto" },
+      { key: "entidad_publica", label: "Entidad pública", tipo: "texto" },
+      { key: "colegiado_profesional", label: "Colegiado profesional", tipo: "booleano" },
+      { key: "nombre_colegio", label: "Nombre del colegio", tipo: "texto" },
+    ],
+  },
 ];
