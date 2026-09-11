@@ -124,6 +124,9 @@ export default function ContactosPage() {
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Teléfono</th>
                 <th className="px-4 py-3">Origen</th>
+                <th className="px-4 py-3">Empresa</th>
+                <th className="px-4 py-3">Entidad pública</th>
+                <th className="px-4 py-3">Colegiado</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -136,6 +139,9 @@ export default function ContactosPage() {
                   <td className="px-4 py-3">{c.email ?? "—"}</td>
                   <td className="px-4 py-3">{c.telefono ?? "—"}</td>
                   <td className="px-4 py-3">{c.origen_lista ?? "—"}</td>
+                  <td className="px-4 py-3">{c.empresa || "—"}</td>
+                  <td className="px-4 py-3">{c.entidad_publica || "—"}</td>
+                  <td className="px-4 py-3">{c.colegiado_profesional ? "✅" : "—"}</td>
                   <td className="px-4 py-3 text-right">
                     <Link
                       href={`/contactos/${c.id}`}
@@ -154,7 +160,7 @@ export default function ContactosPage() {
               ))}
               {!cargando && filtrados.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-zinc-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-zinc-500">
                     {contactos.length === 0
                       ? "Todavía no hay contactos. Añade el primero con el botón de arriba, o importa la lista desde el Excel."
                       : "Sin resultados para esa búsqueda."}

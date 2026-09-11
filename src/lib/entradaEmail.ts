@@ -39,7 +39,7 @@ export async function enviarEmailConEntrada(
     const imagenEntrada = await construirImagenEntrada(datos);
     const resend = new Resend(process.env.RESEND_API_KEY);
     const { error: errorEnvio } = await resend.emails.send({
-      from: "BALVERT 2027 <entradas@app.atrapaesared.es>",
+      from: "BALVERT 2027 <secretaria@balvert.es>",
       to: email,
       subject: `Tu entrada — ${datos.evento} BALVERT 2027`,
       html: construirEmailHtml(datos.nombreAsistente, datos.evento),

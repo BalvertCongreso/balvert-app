@@ -122,7 +122,9 @@ export default function CaptacionPage() {
           <table className="w-full text-left text-sm">
             <thead className="bg-zinc-50 text-xs uppercase text-zinc-500">
               <tr>
-                <th className="px-4 py-3">Empresa / entidad</th>
+                <th className="px-4 py-3">Empresa</th>
+                <th className="px-4 py-3">Entidad pública</th>
+                <th className="px-4 py-3">Colegiado</th>
                 <th className="px-4 py-3">Responsable</th>
                 <th className="px-4 py-3">Interés</th>
                 <th className="px-4 py-3">Contactos</th>
@@ -138,9 +140,9 @@ export default function CaptacionPage() {
                 return (
                   <Fragment key={p.id}>
                     <tr className="border-t border-[var(--borde)]">
-                      <td className="px-4 py-3 font-medium">
-                        {nombre ?? "(sin nombre)"}
-                      </td>
+                      <td className="px-4 py-3 font-medium">{p.empresa || "—"}</td>
+                      <td className="px-4 py-3">{p.entidad_publica || "—"}</td>
+                      <td className="px-4 py-3">{p.colegiado_profesional ? "✅" : "—"}</td>
                       <td className="px-4 py-3">{p.responsable ?? "—"}</td>
                       <td className="px-4 py-3">{p.interes ?? "—"}</td>
                       <td className="px-4 py-3">
@@ -171,7 +173,7 @@ export default function CaptacionPage() {
                     </tr>
                     {expandida && (
                       <tr className="border-t border-[var(--borde)] bg-zinc-50">
-                        <td colSpan={6} className="px-4 py-4">
+                        <td colSpan={8} className="px-4 py-4">
                           <ProspectoContactos
                             prospectoId={p.id}
                             onCambio={() => cargarResumenContactos([p.id])}
@@ -184,7 +186,7 @@ export default function CaptacionPage() {
               })}
               {!cargando && prospectos.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-zinc-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-zinc-500">
                     Todavía no hay prospectos. Añade el primero con el botón de arriba.
                   </td>
                 </tr>
