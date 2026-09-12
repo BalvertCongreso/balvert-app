@@ -27,6 +27,10 @@ export interface Edicion {
   fecha_hora_gala: string | null;
   lugar_excursion: string | null;
   fecha_hora_excursion: string | null;
+
+  precio_congreso: number | null;
+  precio_gala: number | null;
+  precio_excursion: number | null;
 }
 
 export type EdicionInput = Omit<Edicion, "id">;

@@ -36,6 +36,39 @@ function Tarjeta({
   );
 }
 
+function EnlaceInscripcion() {
+  const [copiado, setCopiado] = useState(false);
+  const url = typeof window !== "undefined" ? `${window.location.origin}/entradas` : "/entradas";
+
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      // Sin acceso al portapapeles (permiso denegado, navegador antiguo…):
+      // el enlace ya está visible en pantalla para copiarlo a mano.
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-[var(--borde)] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-zinc-700">Enlace de inscripción</p>
+        <p className="truncate text-sm text-zinc-500">{url}</p>
+      </div>
+      <button
+        type="button"
+        onClick={copiar}
+        className="shrink-0 rounded-md px-4 py-2 text-sm font-semibold text-white"
+        style={{ background: "var(--balvert-azul-oscuro)" }}
+      >
+        {copiado ? "¡Copiado!" : "Copiar enlace"}
+      </button>
+    </div>
+  );
+}
+
 function Fila({ label, valor }: { label: string; valor: string | number }) {
   return (
     <div className="flex items-center justify-between py-1 text-sm">
@@ -203,6 +236,8 @@ export default function Dashboard() {
             : "No hay ninguna edición activa. Marca una edición como activa para ver el resumen."}
         </p>
       </div>
+
+      <EnlaceInscripcion />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <Tarjeta titulo="Patrocinadores">

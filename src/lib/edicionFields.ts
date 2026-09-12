@@ -38,4 +38,27 @@ export const seccionesEdicion: SeccionDef[] = [
       { key: "fecha_hora_excursion", label: "Fecha y hora de la excursión", tipo: "fecha-hora" },
     ],
   },
+  {
+    titulo: "Precios (compra online)",
+    campos: [
+      {
+        key: "precio_congreso",
+        label: "Precio Congreso (€)",
+        tipo: "numero",
+        nota: "Precio por entrada al comprar por el formulario público. Vacío = sin precio configurado todavía.",
+      },
+      {
+        key: "precio_gala",
+        label: "Precio Gala (€)",
+        tipo: "numero",
+        nota: "Precio por entrada al comprar por el formulario público. Vacío = sin precio configurado todavía.",
+      },
+      {
+        key: "precio_excursion",
+        label: "Precio Excursión (€)",
+        tipo: "numero",
+        nota: "Precio por entrada al comprar por el formulario público. Vacío = sin precio configurado todavía.",
+      },
+    ],
+  },
 ];

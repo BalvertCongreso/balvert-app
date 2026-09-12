@@ -6,7 +6,12 @@ import NavHeader from "@/components/NavHeader";
 import LoginForm from "@/components/LoginForm";
 
 // Rutas accesibles sin sesión iniciada.
-const RUTAS_PUBLICAS: string[] = ["/inscripcion-congreso"];
+const RUTAS_PUBLICAS: string[] = [
+  "/inscripcion-congreso",
+  "/entradas",
+  "/entradas/gracias",
+  "/entradas/cancelado",
+];
 
 // Rutas que ocupan todo el ancho de pantalla en vez del max-w-6xl centrado habitual.
 const RUTAS_ANCHO_COMPLETO: string[] = ["/"];
