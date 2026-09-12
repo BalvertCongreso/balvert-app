@@ -172,7 +172,7 @@ export default function InscripcionCongresoPage() {
           <strong>Privacidad:</strong> los datos de este formulario (nombre, email,
           teléfono y cargo) se usan únicamente para gestionar tu inscripción y tu entrada
           al Congreso BALVERT 2027, incluyendo el envío de la entrada por email.
-          Responsable del tratamiento: AtrapaEsaRed, organizadora del congreso. No se
+          Responsable del tratamiento: Garimper 22, organizadora del congreso. No se
           comparten con terceros ajenos a la organización del evento. Si vuelves a
           inscribirte con el mismo email, tus datos se actualizarán en vez de crear una
           inscripción duplicada.
