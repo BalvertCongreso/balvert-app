@@ -9,10 +9,20 @@ import {
   type Tabla,
 } from "@/lib/entradaDatos";
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export async function POST(req: Request) {
   const body = await req.json();
   const tabla = body.tabla as Tabla;
   const id = body.id as string;
+
+  // Reenvío puntual a un email distinto del guardado en la ficha (p.ej. si
+  // alguien perdió su entrada): no toca el dato guardado, solo cambia a
+  // dónde se manda este envío en concreto.
+  const emailDestino = typeof body.emailDestino === "string" ? body.emailDestino.trim() : "";
+  if (emailDestino && !EMAIL_REGEX.test(emailDestino)) {
+    return NextResponse.json({ error: "El email de destino no tiene un formato válido." }, { status: 400 });
+  }
 
   if (!tabla || !NOMBRE_TABLA_SQL[tabla] || !id) {
     return NextResponse.json({ error: "Faltan datos (tabla o id)." }, { status: 400 });
@@ -37,6 +47,7 @@ export async function POST(req: Request) {
   }
 
   const { email } = extraerNombreYEmail(tabla, fila);
+  const destinatario = emailDestino || email;
 
   // Reutiliza el código si ya existía (p.ej. al reenviar); si no, genera uno
   // nuevo. Es un identificador aparte del id de la fila (no el id en sí)
@@ -55,12 +66,12 @@ export async function POST(req: Request) {
     }
   }
 
-  if (!email) {
+  if (!destinatario) {
     return NextResponse.json({ qr_codigo: qrCodigo, enviado: false, email: null });
   }
 
   const datosEntrada = await construirDatosEntrada(supabase, tabla, { ...fila, qr_codigo: qrCodigo });
-  const resultado = await enviarEmailConEntrada(email, tabla, qrCodigo, datosEntrada);
+  const resultado = await enviarEmailConEntrada(destinatario, tabla, qrCodigo, datosEntrada);
 
   if (!resultado.enviado) {
     return NextResponse.json({ qr_codigo: qrCodigo, enviado: false, error: resultado.error }, { status: 502 });
@@ -68,5 +79,5 @@ export async function POST(req: Request) {
 
   await supabase.from(tablaSql).update({ entrada_enviada: "Sí" }).eq("id", id);
 
-  return NextResponse.json({ qr_codigo: qrCodigo, enviado: true, email });
+  return NextResponse.json({ qr_codigo: qrCodigo, enviado: true, email: destinatario });
 }

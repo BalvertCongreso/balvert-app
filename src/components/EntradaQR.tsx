@@ -34,6 +34,7 @@ export default function EntradaQR({
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [imagenBlobUrl, setImagenBlobUrl] = useState<string | null>(null);
+  const [emailDestino, setEmailDestino] = useState("");
 
   // La imagen final (logo + datos + QR) la compone siempre el servidor
   // (misma imagen que se adjunta en el email); aquí solo la mostramos. Se
@@ -71,10 +72,11 @@ export default function EntradaQR({
     setMensaje(null);
     try {
       const headers = await cabeceraAutorizacion();
+      const destinoLimpio = emailDestino.trim();
       const res = await fetch("/api/entradas/enviar", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({ tabla, id: registroId }),
+        body: JSON.stringify({ tabla, id: registroId, ...(destinoLimpio ? { emailDestino: destinoLimpio } : {}) }),
       });
       const data = await res.json();
 
@@ -135,14 +137,29 @@ export default function EntradaQR({
               Descargar entrada
             </a>
             {email && (
-              <button
-                type="button"
-                onClick={generarYEnviar}
-                disabled={enviando}
-                className="text-sm font-medium text-[var(--balvert-azul-oscuro)] hover:underline disabled:opacity-60"
-              >
-                {enviando ? "Reenviando…" : "Reenviar entrada por email"}
-              </button>
+              <div className="flex flex-col gap-2">
+                <div>
+                  <label className="campo-label" htmlFor="email-destino-reenvio">
+                    Enviar a otro email (opcional)
+                  </label>
+                  <input
+                    id="email-destino-reenvio"
+                    type="email"
+                    className="campo-input"
+                    placeholder={email}
+                    value={emailDestino}
+                    onChange={(e) => setEmailDestino(e.target.value)}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={generarYEnviar}
+                  disabled={enviando}
+                  className="self-start text-sm font-medium text-[var(--balvert-azul-oscuro)] hover:underline disabled:opacity-60"
+                >
+                  {enviando ? "Reenviando…" : "Reenviar entrada por email"}
+                </button>
+              </div>
             )}
           </div>
         </div>
