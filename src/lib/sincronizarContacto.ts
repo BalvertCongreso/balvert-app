@@ -26,6 +26,7 @@ export async function sincronizarContactoDesdeProspecto(datos: ProspectoPatrocin
     entidad_publica: datos.entidad_publica ?? null,
     colegiado_profesional: datos.colegiado_profesional ?? false,
     nombre_colegio: datos.nombre_colegio ?? null,
+    nacionalidad: datos.nacionalidad ?? null,
   };
 
   if (existente) {

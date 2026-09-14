@@ -225,6 +225,7 @@ export interface ContactoNewsletter {
   entidad_publica: string | null;
   colegiado_profesional: boolean;
   nombre_colegio: string | null;
+  nacionalidad: string | null;
   fecha_alta: string;
 }
 
@@ -270,6 +271,7 @@ export interface ProspectoPatrocinio {
   entidad_publica: string | null;
   colegiado_profesional: boolean;
   nombre_colegio: string | null;
+  nacionalidad: string | null;
   contacto_nombre: string | null;
   contacto_cargo: string | null;
   contacto_email: string | null;

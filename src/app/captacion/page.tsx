@@ -125,6 +125,7 @@ export default function CaptacionPage() {
                 <th className="px-4 py-3">Empresa</th>
                 <th className="px-4 py-3">Entidad pública</th>
                 <th className="px-4 py-3">Colegiado</th>
+                <th className="px-4 py-3">Nacionalidad</th>
                 <th className="px-4 py-3">Responsable</th>
                 <th className="px-4 py-3">Interés</th>
                 <th className="px-4 py-3">Contactos</th>
@@ -143,6 +144,7 @@ export default function CaptacionPage() {
                       <td className="px-4 py-3 font-medium">{p.empresa || "—"}</td>
                       <td className="px-4 py-3">{p.entidad_publica || "—"}</td>
                       <td className="px-4 py-3">{p.colegiado_profesional ? "✅" : "—"}</td>
+                      <td className="px-4 py-3">{p.nacionalidad || "—"}</td>
                       <td className="px-4 py-3">{p.responsable ?? "—"}</td>
                       <td className="px-4 py-3">{p.interes ?? "—"}</td>
                       <td className="px-4 py-3">
@@ -173,7 +175,7 @@ export default function CaptacionPage() {
                     </tr>
                     {expandida && (
                       <tr className="border-t border-[var(--borde)] bg-zinc-50">
-                        <td colSpan={8} className="px-4 py-4">
+                        <td colSpan={9} className="px-4 py-4">
                           <ProspectoContactos
                             prospectoId={p.id}
                             onCambio={() => cargarResumenContactos([p.id])}
@@ -186,7 +188,7 @@ export default function CaptacionPage() {
               })}
               {!cargando && prospectos.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-zinc-500">
+                  <td colSpan={9} className="px-4 py-8 text-center text-zinc-500">
                     Todavía no hay prospectos. Añade el primero con el botón de arriba.
                   </td>
                 </tr>

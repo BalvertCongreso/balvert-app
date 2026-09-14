@@ -1,4 +1,5 @@
 import type { SeccionDef } from "./patrocinadorFields";
+import { PAISES } from "./paises";
 
 export const seccionesProspecto: SeccionDef[] = [
   {
@@ -8,6 +9,7 @@ export const seccionesProspecto: SeccionDef[] = [
       { key: "entidad_publica", label: "Entidad pública", tipo: "texto" },
       { key: "colegiado_profesional", label: "Colegiado profesional", tipo: "booleano" },
       { key: "nombre_colegio", label: "Nombre del colegio", tipo: "texto" },
+      { key: "nacionalidad", label: "Nacionalidad", tipo: "select", opciones: PAISES },
       {
         key: "responsable",
         label: "Responsable",

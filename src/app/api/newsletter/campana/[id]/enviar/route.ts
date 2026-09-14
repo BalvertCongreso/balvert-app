@@ -12,9 +12,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
 
   const { id } = await ctx.params;
+  const body = await req.json().catch(() => ({}));
+  const scheduledAtUtc = typeof body.scheduledAtUtc === "string" ? body.scheduledAtUtc : undefined;
+  if (scheduledAtUtc && !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(scheduledAtUtc)) {
+    return NextResponse.json(
+      { error: "Formato de fecha programada inválido." },
+      { status: 400 }
+    );
+  }
 
   try {
-    await enviarCampanaATodos(Number(id));
+    await enviarCampanaATodos(Number(id), scheduledAtUtc);
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json(

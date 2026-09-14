@@ -65,7 +65,21 @@ export default function ContactoForm({
                 <label className="campo-label" htmlFor={campo.key}>
                   {campo.label}
                 </label>
-                {campo.tipo === "booleano" ? (
+                {campo.tipo === "select" ? (
+                  <select
+                    id={campo.key}
+                    className="campo-input"
+                    value={valores[campo.key]}
+                    onChange={(e) => actualizar(campo.key, e.target.value)}
+                  >
+                    <option value=""></option>
+                    {campo.opciones?.map((op) => (
+                      <option key={op} value={op}>
+                        {op}
+                      </option>
+                    ))}
+                  </select>
+                ) : campo.tipo === "booleano" ? (
                   <input
                     id={campo.key}
                     type="checkbox"

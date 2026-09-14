@@ -1,4 +1,5 @@
 import type { SeccionDef } from "./patrocinadorFields";
+import { PAISES } from "./paises";
 
 export const seccionesContacto: SeccionDef[] = [
   {
@@ -23,6 +24,7 @@ export const seccionesContacto: SeccionDef[] = [
       { key: "entidad_publica", label: "Entidad pública", tipo: "texto" },
       { key: "colegiado_profesional", label: "Colegiado profesional", tipo: "booleano" },
       { key: "nombre_colegio", label: "Nombre del colegio", tipo: "texto" },
+      { key: "nacionalidad", label: "Nacionalidad", tipo: "select", opciones: PAISES },
     ],
   },
 ];

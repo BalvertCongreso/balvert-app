@@ -24,6 +24,22 @@ function htmlEstaVacio(html: string): boolean {
   return html.replace(/<[^>]*>/g, "").trim().length === 0;
 }
 
+// El input datetime-local devuelve "YYYY-MM-DDTHH:MM" sin zona horaria: el
+// navegador lo interpreta como hora local de quien lo escribe (Ariadna), así
+// que new Date(...) ya lo trata como hora local y toISOString() lo pasa a UTC.
+function localAUtcMailrelay(datetimeLocal: string): string {
+  const fecha = new Date(datetimeLocal);
+  return fecha.toISOString().slice(0, 19).replace("T", " ");
+}
+
+function formatearFechaLocal(datetimeLocal: string): string {
+  const fecha = new Date(datetimeLocal);
+  return fecha.toLocaleString("es-ES", {
+    dateStyle: "long",
+    timeStyle: "short",
+  });
+}
+
 export default function NewsletterPage() {
   const [asunto, setAsunto] = useState("");
   const [contenido, setContenido] = useState("");
@@ -37,6 +53,9 @@ export default function NewsletterPage() {
 
   const [emailPrueba, setEmailPrueba] = useState("");
   const [confirmacion, setConfirmacion] = useState("");
+
+  const [programarEnvio, setProgramarEnvio] = useState(false);
+  const [fechaProgramada, setFechaProgramada] = useState("");
 
   const [estado, setEstado] = useState<
     "idle" | "prueba" | "sincronizando" | "enviando" | "hecho" | "error"
@@ -100,6 +119,12 @@ export default function NewsletterPage() {
     if (!asunto.trim()) return "Falta el asunto.";
     if (htmlEstaVacio(contenido)) return "Falta el contenido.";
     if (!remitenteId) return "Elige un remitente.";
+    if (programarEnvio) {
+      if (!fechaProgramada) return "Elige la fecha y hora de envío.";
+      if (new Date(fechaProgramada).getTime() <= Date.now()) {
+        return "La fecha programada debe ser en el futuro.";
+      }
+    }
     return null;
   }
 
@@ -148,10 +173,13 @@ export default function NewsletterPage() {
       setError('Escribe "ENVIAR" en el cuadro de confirmación para continuar.');
       return;
     }
+    const cuando = programarEnvio
+      ? `se programará para el ${formatearFechaLocal(fechaProgramada)}`
+      : "se enviará ya mismo";
     const ok = window.confirm(
       `Vas a enviar esta newsletter a ${totalDestinatarios ?? "?"} contacto(s) reales${
         origenFiltro ? ` (origen: ${origenFiltro})` : ""
-      }. Esta acción no se puede deshacer. ¿Confirmas?`
+      } — ${cuando}. Esta acción no se puede deshacer. ¿Confirmas?`
     );
     if (!ok) return;
 
@@ -180,11 +208,18 @@ export default function NewsletterPage() {
         html,
         groupId,
       });
-      await llamarApiJson(`/api/newsletter/campana/${campaignId}/enviar`, {});
+      const scheduledAtUtc = programarEnvio ? localAUtcMailrelay(fechaProgramada) : undefined;
+      await llamarApiJson(`/api/newsletter/campana/${campaignId}/enviar`, { scheduledAtUtc });
 
       setEstado("hecho");
-      setMensaje(`Newsletter enviada a ${contactos.length} contacto(s).`);
+      setMensaje(
+        programarEnvio
+          ? `Newsletter programada para ${contactos.length} contacto(s) el ${formatearFechaLocal(fechaProgramada)}.`
+          : `Newsletter enviada a ${contactos.length} contacto(s).`
+      );
       setConfirmacion("");
+      setProgramarEnvio(false);
+      setFechaProgramada("");
     } catch (e) {
       setEstado("error");
       setError(e instanceof Error ? e.message : "No se pudo enviar la newsletter.");
@@ -320,6 +355,36 @@ export default function NewsletterPage() {
           <strong>{totalDestinatarios ?? "…"} contacto(s) reales</strong>. No se puede deshacer.
           Escribe <strong>ENVIAR</strong> para desbloquear el botón.
         </p>
+
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2 text-sm text-zinc-700">
+            <input
+              type="checkbox"
+              checked={programarEnvio}
+              onChange={(e) => setProgramarEnvio(e.target.checked)}
+              disabled={enviando}
+            />
+            Programar envío para más tarde (en vez de enviar ya)
+          </label>
+          {programarEnvio && (
+            <div>
+              <label className="campo-label">Fecha y hora de envío (tu hora local)</label>
+              <input
+                type="datetime-local"
+                className="campo-input"
+                value={fechaProgramada}
+                onChange={(e) => setFechaProgramada(e.target.value)}
+                disabled={enviando}
+              />
+              {fechaProgramada && (
+                <p className="mt-1 text-xs text-zinc-400">
+                  Se enviará el {formatearFechaLocal(fechaProgramada)}.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <div className="flex-1">
             <label className="campo-label">Confirmación</label>
@@ -337,7 +402,11 @@ export default function NewsletterPage() {
             disabled={enviando || confirmacion !== "ENVIAR"}
             className="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
           >
-            {estado === "sincronizando" || estado === "enviando" ? "Enviando…" : "Enviar a todos"}
+            {estado === "sincronizando" || estado === "enviando"
+              ? "Enviando…"
+              : programarEnvio
+                ? "Programar envío"
+                : "Enviar a todos"}
           </button>
         </div>
         {progreso && estado === "sincronizando" && (

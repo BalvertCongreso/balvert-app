@@ -109,8 +109,14 @@ export async function crearCampana(params: {
   return data.id;
 }
 
-export async function enviarCampanaATodos(campaignId: number): Promise<void> {
-  await llamar(`/campaigns/${campaignId}/send_all`, { method: "POST" });
+export async function enviarCampanaATodos(
+  campaignId: number,
+  scheduledAtUtc?: string
+): Promise<void> {
+  await llamar(`/campaigns/${campaignId}/send_all`, {
+    method: "POST",
+    body: scheduledAtUtc ? { scheduled_at: scheduledAtUtc } : undefined,
+  });
 }
 
 export async function enviarCampanaDePrueba(
