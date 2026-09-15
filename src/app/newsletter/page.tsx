@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { construirHtmlNewsletter } from "@/lib/newsletterHtml";
 import { obtenerTodasLasFilas } from "@/lib/paginarTodo";
@@ -65,6 +65,13 @@ export default function NewsletterPage() {
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Evita que el efecto de AUTOGUARDAR se ejecute con los valores vacíos del
+  // primer render (antes de que el efecto de RESTAURAR llegue a leer
+  // localStorage) y borre el borrador real. Los dos efectos se ejecutan de
+  // forma síncrona en el mismo commit al montar, así que sin esta bandera el
+  // de guardar siempre gana la carrera y deja localStorage vacío.
+  const borradorRestauradoRef = useRef(false);
+
   // Recupera un borrador guardado en este navegador si la pantalla se abre
   // vacía (p. ej. tras una recarga accidental antes de enviar).
   useEffect(() => {
@@ -80,6 +87,12 @@ export default function NewsletterPage() {
         }
       } catch {
         // localStorage no disponible o dato corrupto: no es crítico, se ignora.
+      } finally {
+        // Se marca DESPUÉS de aplicar (o descartar) la restauración, nunca
+        // antes: si no hay borrador, no cambian asunto/contenido y no pasa
+        // nada; si lo hay, el guardado no debe correr hasta que esos setState
+        // se hayan aplicado, o volvería a pisar el borrador con "".
+        borradorRestauradoRef.current = true;
       }
     });
   }, []);
@@ -87,6 +100,7 @@ export default function NewsletterPage() {
   // Autoguardado del borrador mientras se escribe, para que sobreviva a una
   // recarga accidental. Solo en este navegador, no se manda a ningún sitio.
   useEffect(() => {
+    if (!borradorRestauradoRef.current) return;
     try {
       if (asunto.trim() || !htmlEstaVacio(contenido)) {
         window.localStorage.setItem(CLAVE_BORRADOR, JSON.stringify({ asunto, contenido }));
