@@ -19,6 +19,7 @@ interface ContactoEnvio {
 }
 
 const TAMANO_LOTE = 100;
+const CLAVE_BORRADOR = "balvert_newsletter_borrador";
 
 function htmlEstaVacio(html: string): boolean {
   return html.replace(/<[^>]*>/g, "").trim().length === 0;
@@ -63,6 +64,39 @@ export default function NewsletterPage() {
   const [progreso, setProgreso] = useState<{ actual: number; total: number } | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Recupera un borrador guardado en este navegador si la pantalla se abre
+  // vacía (p. ej. tras una recarga accidental antes de enviar).
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      try {
+        const guardado = window.localStorage.getItem(CLAVE_BORRADOR);
+        if (!guardado) return;
+        const datos = JSON.parse(guardado) as { asunto?: string; contenido?: string };
+        if (datos.asunto) setAsunto(datos.asunto);
+        if (datos.contenido) setContenido(datos.contenido);
+        if (datos.asunto || (datos.contenido && !htmlEstaVacio(datos.contenido))) {
+          setMensaje("Se ha recuperado un borrador guardado automáticamente en este navegador.");
+        }
+      } catch {
+        // localStorage no disponible o dato corrupto: no es crítico, se ignora.
+      }
+    });
+  }, []);
+
+  // Autoguardado del borrador mientras se escribe, para que sobreviva a una
+  // recarga accidental. Solo en este navegador, no se manda a ningún sitio.
+  useEffect(() => {
+    try {
+      if (asunto.trim() || !htmlEstaVacio(contenido)) {
+        window.localStorage.setItem(CLAVE_BORRADOR, JSON.stringify({ asunto, contenido }));
+      } else {
+        window.localStorage.removeItem(CLAVE_BORRADOR);
+      }
+    } catch {
+      // localStorage no disponible: no es crítico, simplemente no se autoguarda.
+    }
+  }, [asunto, contenido]);
 
   useEffect(() => {
     obtenerTodasLasFilas<{ origen_lista: string }>((desde, hasta) =>
@@ -195,10 +229,28 @@ export default function NewsletterPage() {
 
       setEstado("sincronizando");
       setProgreso({ actual: 0, total: contactos.length });
+      const erroresSincronizacion: string[] = [];
       for (let i = 0; i < contactos.length; i += TAMANO_LOTE) {
         const lote = contactos.slice(i, i + TAMANO_LOTE);
-        await llamarApiJson("/api/newsletter/sincronizar-lote", { groupId, contactos: lote });
+        const resultado: { sincronizados: number; errores: string[] } = await llamarApiJson(
+          "/api/newsletter/sincronizar-lote",
+          { groupId, contactos: lote }
+        );
+        if (Array.isArray(resultado.errores)) erroresSincronizacion.push(...resultado.errores);
         setProgreso({ actual: Math.min(i + TAMANO_LOTE, contactos.length), total: contactos.length });
+      }
+
+      // Si algún contacto no se pudo sincronizar con Mailrelay, no seguimos:
+      // mejor avisar y dejar que se reintente que mandar la newsletter a solo
+      // una parte de la lista sin que nadie se entere.
+      if (erroresSincronizacion.length > 0) {
+        setEstado("error");
+        setError(
+          `No se pudo sincronizar ${erroresSincronizacion.length} de ${contactos.length} contacto(s) con Mailrelay, así que NO se ha enviado la newsletter (para evitar mandarla incompleta). Espera unos minutos y vuelve a intentarlo. Detalle: ${erroresSincronizacion
+            .slice(0, 5)
+            .join("; ")}${erroresSincronizacion.length > 5 ? "…" : ""}`
+        );
+        return;
       }
 
       setEstado("enviando");
@@ -209,7 +261,11 @@ export default function NewsletterPage() {
         groupId,
       });
       const scheduledAtUtc = programarEnvio ? localAUtcMailrelay(fechaProgramada) : undefined;
-      await llamarApiJson(`/api/newsletter/campana/${campaignId}/enviar`, { scheduledAtUtc });
+      await llamarApiJson(`/api/newsletter/campana/${campaignId}/enviar`, {
+        scheduledAtUtc,
+        asunto,
+        totalContactos: contactos.length,
+      });
 
       setEstado("hecho");
       setMensaje(
@@ -220,6 +276,11 @@ export default function NewsletterPage() {
       setConfirmacion("");
       setProgramarEnvio(false);
       setFechaProgramada("");
+      try {
+        window.localStorage.removeItem(CLAVE_BORRADOR);
+      } catch {
+        // localStorage no disponible: sin efecto, la newsletter ya se envió igualmente.
+      }
     } catch (e) {
       setEstado("error");
       setError(e instanceof Error ? e.message : "No se pudo enviar la newsletter.");

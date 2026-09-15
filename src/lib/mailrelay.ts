@@ -6,7 +6,11 @@
 interface MailrelayError {
   status: number;
   body: unknown;
+  reintentable?: boolean;
 }
+
+const MENSAJE_LIMITE_PETICIONES =
+  "Mailrelay no responde ahora mismo (parece un límite temporal de peticiones o una caída puntual de su API). Espera unos minutos e inténtalo de nuevo.";
 
 function config() {
   const baseUrl = process.env.MAILRELAY_API_URL;
@@ -19,7 +23,11 @@ function config() {
   return { baseUrl: baseUrl.replace(/\/$/, ""), apiKey };
 }
 
-async function llamar<T>(
+function esperar(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function llamarUnaVez<T>(
   path: string,
   options: { method?: string; body?: unknown } = {}
 ): Promise<T> {
@@ -34,9 +42,25 @@ async function llamar<T>(
   });
 
   const texto = await res.text();
-  const cuerpo = texto ? JSON.parse(texto) : null;
+  let cuerpo: unknown = null;
+  let esJson = true;
+  if (texto) {
+    try {
+      cuerpo = JSON.parse(texto);
+    } catch {
+      // Mailrelay a veces responde con texto plano ("Retry later") en vez de
+      // JSON cuando está saturado — no dejar que eso reviente como un error
+      // de sintaxis sin explicar qué significa.
+      esJson = false;
+      cuerpo = texto;
+    }
+  }
 
   if (!res.ok) {
+    if (res.status === 429 || res.status === 503 || !esJson) {
+      const error: MailrelayError = { status: res.status, body: cuerpo, reintentable: true };
+      throw Object.assign(new Error(MENSAJE_LIMITE_PETICIONES), error);
+    }
     const detalle =
       cuerpo && typeof cuerpo === "object"
         ? JSON.stringify(cuerpo)
@@ -50,6 +74,27 @@ async function llamar<T>(
   return cuerpo as T;
 }
 
+// Reintenta con una pequeña pausa creciente solo cuando el fallo parece un
+// límite temporal de peticiones de Mailrelay (ver `reintentable` más arriba).
+// Otros errores (datos inválidos, auth, etc.) fallan a la primera: reintentarlos
+// no arreglaría nada.
+async function llamar<T>(
+  path: string,
+  options: { method?: string; body?: unknown; reintentos?: number } = {}
+): Promise<T> {
+  const intentosTotales = (options.reintentos ?? 0) + 1;
+  for (let intento = 1; intento <= intentosTotales; intento++) {
+    try {
+      return await llamarUnaVez<T>(path, options);
+    } catch (e) {
+      const reintentable = (e as MailrelayError)?.reintentable === true;
+      if (!reintentable || intento === intentosTotales) throw e;
+      await esperar(1000 * intento);
+    }
+  }
+  throw new Error("No se pudo completar la petición a Mailrelay.");
+}
+
 export interface Remitente {
   id: number;
   name: string | null;
@@ -57,7 +102,9 @@ export interface Remitente {
 }
 
 export async function listarRemitentes(): Promise<Remitente[]> {
-  const data = await llamar<{ data?: Remitente[] } | Remitente[]>("/senders");
+  const data = await llamar<{ data?: Remitente[] } | Remitente[]>("/senders", {
+    reintentos: 2,
+  });
   return Array.isArray(data) ? data : data.data ?? [];
 }
 
@@ -84,6 +131,7 @@ export async function sincronizarSuscriptor(params: {
       replace_groups: false,
       restore_if_deleted: true,
     },
+    reintentos: 2,
   });
 }
 
@@ -109,13 +157,38 @@ export async function crearCampana(params: {
   return data.id;
 }
 
+export interface CampanaEnviada {
+  id: number;
+  subject?: string;
+  // "pending" | "processing" | "finished" | "paused" | "cancelled" | "inactive"
+  status?: string;
+  sent_emails_count?: number;
+  processed_emails_count?: number;
+  delivered_emails_count?: number;
+  bounced_emails_count?: number;
+  soft_bounced_emails_count?: number;
+}
+
 export async function enviarCampanaATodos(
   campaignId: number,
-  scheduledAtUtc?: string
-): Promise<void> {
-  await llamar(`/campaigns/${campaignId}/send_all`, {
+  opciones: { scheduledAtUtc?: string; callbackUrl?: string } = {}
+): Promise<CampanaEnviada> {
+  const body: { scheduled_at?: string; callback_url?: string } = {};
+  if (opciones.scheduledAtUtc) body.scheduled_at = opciones.scheduledAtUtc;
+  if (opciones.callbackUrl) body.callback_url = opciones.callbackUrl;
+  return await llamar<CampanaEnviada>(`/campaigns/${campaignId}/send_all`, {
     method: "POST",
-    body: scheduledAtUtc ? { scheduled_at: scheduledAtUtc } : undefined,
+    body: Object.keys(body).length > 0 ? body : undefined,
+  });
+}
+
+// Tras un envío programado, Mailrelay avisa a nuestro callback_url con
+// {"type":"sent_campaign_finished","id":<sentCampaignId>} — sin decir si fue
+// bien o mal. Hay que consultar esto para saber el estado real y los números
+// de entrega antes de avisar a Ariadna.
+export async function obtenerCampanaEnviada(sentCampaignId: number): Promise<CampanaEnviada> {
+  return await llamar<CampanaEnviada>(`/sent_campaigns/${sentCampaignId}`, {
+    reintentos: 2,
   });
 }
 
