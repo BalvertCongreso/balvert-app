@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { nombreTieneApellidos, validarDocumento } from "@/lib/documentoIdentidad";
+import {
+  AYUDA_DOCUMENTO,
+  NOMBRE_DOCUMENTO,
+  TIPOS_DOCUMENTO,
+  esTipoDocumento,
+  nombreTieneApellidos,
+  validarDocumento,
+} from "@/lib/documentoIdentidad";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -33,6 +40,7 @@ interface Precios {
 
 interface Persona {
   nombre: string;
+  tipoDocumento: string;
   documento: string;
   // Gala
   menu: string;
@@ -45,6 +53,7 @@ interface Persona {
 
 const personaVacia = (): Persona => ({
   nombre: "",
+  tipoDocumento: "",
   documento: "",
   menu: "",
   alergias: "",
@@ -129,16 +138,37 @@ function SeccionTipo({
               </button>
             </div>
 
-            <input
-              type="text"
-              className="campo-input"
-              placeholder="Documento de identidad (DNI, NIE o pasaporte) *"
-              aria-label="Documento de identidad (DNI, NIE o pasaporte)"
-              autoComplete="off"
-              maxLength={30}
-              value={persona.documento}
-              onChange={(e) => actualizar(i, { documento: e.target.value })}
-            />
+            <div className="grid gap-2 sm:grid-cols-[12rem_1fr]">
+              <select
+                className="campo-input"
+                aria-label="Tipo de documento"
+                value={persona.tipoDocumento}
+                onChange={(e) => actualizar(i, { tipoDocumento: e.target.value })}
+              >
+                <option value="">Tipo de documento *</option>
+                {TIPOS_DOCUMENTO.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                className="campo-input"
+                placeholder={
+                  persona.tipoDocumento === "Pasaporte"
+                    ? "Número de pasaporte *"
+                    : persona.tipoDocumento
+                    ? `Número de ${persona.tipoDocumento} *`
+                    : "Número de documento *"
+                }
+                aria-label="Número de documento de identidad"
+                autoComplete="off"
+                maxLength={30}
+                value={persona.documento}
+                onChange={(e) => actualizar(i, { documento: e.target.value })}
+              />
+            </div>
 
             {tipo === "gala" && (
               <div className="grid gap-2 sm:grid-cols-[12rem_1fr]">
@@ -280,13 +310,17 @@ export default function EntradasPage() {
           setError(`Escribe nombre y apellidos de "${p.nombre}" en ${seccion}.`);
           return;
         }
+        if (!esTipoDocumento(p.tipoDocumento)) {
+          setError(`Elige el tipo de documento (DNI, NIE o pasaporte) de ${p.nombre} (${seccion}).`);
+          return;
+        }
         if (!p.documento.trim()) {
           setError(`Indica el documento de identidad de ${p.nombre} (${seccion}).`);
           return;
         }
-        if (!validarDocumento(p.documento)) {
+        if (!validarDocumento(p.documento, p.tipoDocumento)) {
           setError(
-            `El documento de identidad de ${p.nombre} (${seccion}) no es válido. Revisa el DNI/NIE (la letra debe ser la correcta) o el pasaporte.`
+            `El ${NOMBRE_DOCUMENTO[p.tipoDocumento]} de ${p.nombre} (${seccion}) no es válido. ${AYUDA_DOCUMENTO[p.tipoDocumento]}`
           );
           return;
         }
@@ -311,14 +345,14 @@ export default function EntradasPage() {
           g.tipo === "congreso"
             ? {
                 nombre: p.nombre,
-                documento_identidad: p.documento,
+                tipo_documento: p.tipoDocumento, documento_identidad: p.documento,
                 colegiado_profesional: p.colegiado,
                 nombre_colegio: p.colegiado ? p.colegio.trim() : null,
                 numero_colegiado: p.colegiado ? p.numeroColegiado.trim() : null,
               }
             : g.tipo === "gala"
-            ? { nombre: p.nombre, documento_identidad: p.documento, menu: p.menu, alergias_intolerancias: p.alergias.trim() }
-            : { nombre: p.nombre, documento_identidad: p.documento }
+            ? { nombre: p.nombre, tipo_documento: p.tipoDocumento, documento_identidad: p.documento, menu: p.menu, alergias_intolerancias: p.alergias.trim() }
+            : { nombre: p.nombre, tipo_documento: p.tipoDocumento, documento_identidad: p.documento }
         );
       }
 

@@ -3,7 +3,7 @@ import { crearClienteServicio } from "@/lib/supabaseServidor";
 import { crearClienteStripe } from "@/lib/stripe";
 import type Stripe from "stripe";
 import { MENUS, type GruposCompra } from "@/lib/compraPendiente";
-import { nombreTieneApellidos, validarDocumento } from "@/lib/documentoIdentidad";
+import { AYUDA_DOCUMENTO, NOMBRE_DOCUMENTO, esTipoDocumento, nombreTieneApellidos, validarDocumento } from "@/lib/documentoIdentidad";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -71,14 +71,17 @@ function personasCrudas(valor: unknown, tipo: Tipo): Record<string, unknown>[] {
 // El mensaje de error nunca incluye el documento, solo el nombre.
 function documentoValido(p: Record<string, unknown>, tipo: Tipo): string {
   const nombre = texto(p.nombre);
+  if (!esTipoDocumento(p.tipo_documento)) {
+    throw new ErrorValidacion(`Elige el tipo de documento (DNI, NIE o pasaporte) de ${nombre} (${NOMBRE_EVENTO[tipo]}).`);
+  }
   const crudo = typeof p.documento_identidad === "string" ? p.documento_identidad : "";
   if (!crudo.trim()) {
     throw new ErrorValidacion(`Indica el documento de identidad de ${nombre} (${NOMBRE_EVENTO[tipo]}).`);
   }
-  const doc = validarDocumento(crudo);
+  const doc = validarDocumento(crudo, p.tipo_documento);
   if (!doc) {
     throw new ErrorValidacion(
-      `El documento de identidad de ${nombre} (${NOMBRE_EVENTO[tipo]}) no es válido. Revisa el DNI/NIE (la letra debe ser la correcta) o el pasaporte.`
+      `El ${NOMBRE_DOCUMENTO[p.tipo_documento]} de ${nombre} (${NOMBRE_EVENTO[tipo]}) no es válido. ${AYUDA_DOCUMENTO[p.tipo_documento]}`
     );
   }
   return doc;
