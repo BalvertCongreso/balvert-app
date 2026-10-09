@@ -31,6 +31,7 @@ export interface Edicion {
   precio_congreso: number | null;
   precio_gala: number | null;
   precio_excursion: number | null;
+  precio_congreso_colegiado: number | null;
 }
 
 export type EdicionInput = Omit<Edicion, "id">;
@@ -151,6 +152,9 @@ export interface AsistenteCongreso {
     | null;
   menu: "Carne" | "Pescado" | "Vegetariano" | "Vegano" | null;
   alergias_intolerancias: string | null;
+  colegiado_profesional: boolean | null;
+  nombre_colegio: string | null;
+  numero_colegiado: string | null;
   confirmado: "Sí" | "No" | "Pendiente" | null;
   entrada_enviada: SiNo | null;
   precio: number | null;

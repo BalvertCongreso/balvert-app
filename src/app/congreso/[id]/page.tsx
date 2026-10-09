@@ -34,7 +34,7 @@ export default function EditarAsistenteCongresoPage() {
     cargar();
   }, [id]);
 
-  async function guardar(datos: Record<string, string | number | null>) {
+  async function guardar(datos: Record<string, string | number | boolean | null>) {
     setGuardando(true);
     const { error } = await supabase.from("asistentes_congreso").update(datos).eq("id", id);
     setGuardando(false);

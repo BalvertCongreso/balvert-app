@@ -19,7 +19,7 @@ export default function NuevoAsistenteCongresoPage() {
     obtenerEdicionActiva().then(setEdicion);
   }, []);
 
-  async function guardar(datos: Record<string, string | number | null>) {
+  async function guardar(datos: Record<string, string | number | boolean | null>) {
     setGuardando(true);
     const { error } = await supabase
       .from("asistentes_congreso")

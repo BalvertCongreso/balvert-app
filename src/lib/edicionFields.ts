@@ -48,6 +48,12 @@ export const seccionesEdicion: SeccionDef[] = [
         nota: "Precio por entrada al comprar por el formulario público. Vacío = sin precio configurado todavía.",
       },
       {
+        key: "precio_congreso_colegiado",
+        label: "Precio Congreso colegiados (€)",
+        tipo: "numero",
+        nota: "Precio por entrada de Congreso para quien marque \"Soy colegiado\". Vacío = no se ofrece esa opción en el formulario público.",
+      },
+      {
         key: "precio_gala",
         label: "Precio Gala (€)",
         tipo: "numero",

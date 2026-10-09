@@ -5,6 +5,7 @@ import { crearClienteServicio } from "@/lib/supabaseServidor";
 import { crearClienteStripe } from "@/lib/stripe";
 import { enviarEmailConVariasEntradas, type EntradaParaEmail } from "@/lib/entradaEmail";
 import { NOMBRE_TABLA_SQL, construirDatosEntrada, type Tabla } from "@/lib/entradaDatos";
+import type { GruposCompra, PersonaCongreso, PersonaGala } from "@/lib/compraPendiente";
 
 export const runtime = "nodejs";
 
@@ -17,8 +18,10 @@ const TIPOS: Tabla[] = ["congreso", "gala", "excursion"];
 // crean aquí, tras verificar la firma del evento con STRIPE_WEBHOOK_SECRET.
 //
 // Fase 7c: una misma sesión de Stripe puede combinar varios tipos de entrada
-// (Congreso + Gala + Excursión juntos o por separado) — la metadata trae un
-// grupo "nombres_<tipo>" por cada tipo comprado. Se procesa cada grupo con
+// (Congreso + Gala + Excursión juntos o por separado). La metadata solo trae
+// "compra_pendiente_id": la compra completa (comprador, personas, menú,
+// alergias, datos de colegiado y precio de cada una) se lee de la tabla
+// compras_pendientes, que guardó crear-sesion. Se procesa cada grupo con
 // la misma lógica que en el hito anterior (idempotencia por
 // referencia_pago_online, propia de cada tabla) y, al final, se manda un
 // único email al comprador con todas las entradas generadas en esta compra.
@@ -45,41 +48,60 @@ export async function POST(req: Request) {
   }
 
   const session = event.data.object as Stripe.Checkout.Session;
-  const metadata = session.metadata ?? {};
-
-  const compradorEmail = metadata.comprador_email || null;
-  const compradorTelefono = metadata.comprador_telefono || null;
-  const compradorCargo = metadata.comprador_cargo || null;
-  const edicionId = metadata.edicion_id || null;
-
-  const grupos: { tipo: Tabla; nombres: string[] }[] = [];
-  for (const tipo of TIPOS) {
-    const crudo = metadata[`nombres_${tipo}`];
-    if (!crudo) continue;
-    try {
-      const nombres = JSON.parse(crudo);
-      if (Array.isArray(nombres) && nombres.length > 0) {
-        grupos.push({ tipo, nombres });
-      }
-    } catch {
-      // metadata corrupta para este tipo: se ignora ese grupo, no toda la compra.
-      console.error(`Webhook Stripe: metadata "nombres_${tipo}" no es JSON válido`, crudo);
-    }
+  const compraId = session.metadata?.compra_pendiente_id || null;
+  if (!compraId) {
+    return NextResponse.json({ error: "La sesión no trae compra_pendiente_id." }, { status: 400 });
   }
 
-  if (!compradorEmail || grupos.length === 0) {
-    return NextResponse.json({ error: "Metadata de la sesión incompleta." }, { status: 400 });
+  const supabase = crearClienteServicio();
+  const { data: compra, error: errorCompra } = await supabase
+    .from("compras_pendientes")
+    .select("*")
+    .eq("id", compraId)
+    .maybeSingle();
+
+  if (errorCompra) {
+    // Fallo de base de datos: se responde 500 para que Stripe reintente.
+    console.error(`Webhook Stripe: fallo leyendo la compra pendiente ${compraId}`, errorCompra);
+    return NextResponse.json({ error: "No se pudo leer la compra pendiente." }, { status: 500 });
   }
+  if (!compra) {
+    console.error(`Webhook Stripe: compra pendiente ${compraId} no encontrada (sesión ${session.id})`);
+    return NextResponse.json({ error: "Compra pendiente no encontrada." }, { status: 400 });
+  }
+  if (compra.stripe_session_id && compra.stripe_session_id !== session.id) {
+    console.error(
+      `Webhook Stripe: la compra ${compraId} pertenece a la sesión ${compra.stripe_session_id}, no a ${session.id}`
+    );
+    return NextResponse.json({ error: "La compra no corresponde a esta sesión." }, { status: 400 });
+  }
+  if (session.amount_total !== null && session.amount_total !== compra.importe_total_cents) {
+    // No debería pasar nunca (el importe lo calcula crear-sesion a partir de
+    // esta misma fila). Se deja constancia pero se generan las entradas: el
+    // cliente ya ha pagado.
+    console.error(
+      `Webhook Stripe: importe cobrado (${session.amount_total}) distinto del guardado (${compra.importe_total_cents}) en la compra ${compraId}`
+    );
+  }
+
+  const compradorEmail: string = compra.comprador_email;
+  const compradorTelefono: string | null = compra.comprador_telefono;
+  const compradorCargo: string | null = compra.comprador_cargo;
+  const edicionId: string | null = compra.edicion_id;
+  const gruposCompra = (compra.grupos ?? {}) as GruposCompra;
 
   // Identificador estable de este pago. payment_intent es lo normal en modo
   // "payment"; session.id como último recurso si no llegara a existir.
   const referencia = (typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id) || session.id;
-  const supabase = crearClienteServicio();
 
   const entradasParaEmail: EntradaParaEmail[] = [];
   const filasParaMarcarEnviadas: { tabla: Tabla; id: string }[] = [];
 
-  for (const { tipo, nombres } of grupos) {
+  let huboFallos = false;
+
+  for (const tipo of TIPOS) {
+    const personas = gruposCompra[tipo];
+    if (!personas || personas.length === 0) continue;
     const tablaSql = NOMBRE_TABLA_SQL[tipo];
 
     // Idempotencia por grupo/tabla: Stripe puede reintentar el mismo evento
@@ -94,20 +116,17 @@ export async function POST(req: Request) {
 
     if (errorExistente) {
       console.error(`Webhook Stripe: fallo comprobando duplicados en ${tablaSql}`, errorExistente);
+      huboFallos = true;
       continue;
     }
     if (existente && existente.length > 0) {
       continue;
     }
 
-    // El precio por unidad de este grupo viaja en la propia metadata (el que
-    // se cobró en el momento de crear la sesión), para no depender de
-    // volver a consultar el precio actual de la edición (que pudo cambiar
-    // entre la compra y este evento) ni de expandir line_items de Stripe.
-    const precioCents = metadata[`precio_cents_${tipo}`];
-    const precioUnitario = precioCents ? Number(precioCents) / 100 : null;
-
-    for (const nombre of nombres) {
+    // El precio de cada persona es el que se calculó en crear-sesion (el
+    // que se cobró), no el precio actual de la edición, que pudo cambiar
+    // entre la compra y este evento.
+    for (const persona of personas) {
       const qrCodigo = randomUUID();
       const filaComun = {
         id: randomUUID(),
@@ -123,31 +142,40 @@ export async function POST(req: Request) {
         referencia_pago_online: referencia,
       };
 
-      const fila: Record<string, unknown> =
-        tipo === "congreso"
-          ? {
-              ...filaComun,
-              nombre,
-              email: compradorEmail,
-              telefono: compradorTelefono,
-              tipo_acceso: "Independiente" as const,
-              precio: precioUnitario,
-            }
-          : tipo === "gala"
-          ? {
-              ...filaComun,
-              nombre_asistente: nombre,
-              email_asistente: compradorEmail,
-              tipo_entrada: "Comprada" as const,
-              precio_entrada: precioUnitario,
-            }
-          : {
-              ...filaComun,
-              nombre_asistente: nombre,
-              email_asistente: compradorEmail,
-              tipo_entrada: "Comprada (10€)" as const,
-              precio: precioUnitario,
-            };
+      let fila: Record<string, unknown>;
+      if (tipo === "congreso") {
+        const p = persona as PersonaCongreso;
+        fila = {
+          ...filaComun,
+          nombre: p.nombre,
+          email: compradorEmail,
+          telefono: compradorTelefono,
+          tipo_acceso: "Independiente" as const,
+          precio: p.precio,
+          colegiado_profesional: p.colegiado_profesional,
+          nombre_colegio: p.nombre_colegio,
+          numero_colegiado: p.numero_colegiado,
+        };
+      } else if (tipo === "gala") {
+        const p = persona as PersonaGala;
+        fila = {
+          ...filaComun,
+          nombre_asistente: p.nombre,
+          email_asistente: compradorEmail,
+          tipo_entrada: "Comprada" as const,
+          precio_entrada: p.precio,
+          menu: p.menu,
+          alergias_intolerancias: p.alergias_intolerancias,
+        };
+      } else {
+        fila = {
+          ...filaComun,
+          nombre_asistente: persona.nombre,
+          email_asistente: compradorEmail,
+          tipo_entrada: "Comprada (10€)" as const,
+          precio: persona.precio,
+        };
+      }
 
       const { data: filaInsertada, error: errorInsercion } = await supabase
         .from(tablaSql)
@@ -157,6 +185,7 @@ export async function POST(req: Request) {
 
       if (errorInsercion || !filaInsertada) {
         console.error(`Webhook Stripe: fallo al crear entrada en ${tablaSql} (referencia ${referencia})`, errorInsercion);
+        huboFallos = true;
         continue;
       }
 
@@ -164,6 +193,20 @@ export async function POST(req: Request) {
       entradasParaEmail.push({ tabla: tipo, qrCodigo, datos: datosEntrada });
       filasParaMarcarEnviadas.push({ tabla: tipo, id: filaInsertada.id });
     }
+  }
+
+  // La compra se marca como usada solo si todo salió bien; si algo falló se
+  // queda sin marcar, para que se vea en compras_pendientes que necesita
+  // revisión. "Usada" no bloquea un reenvío del evento desde Stripe: la
+  // protección real contra duplicados sigue siendo la comprobación por
+  // referencia_pago_online de cada tabla (así un reenvío puede completar
+  // una tabla que falló sin duplicar las que ya se crearon).
+  if (!huboFallos) {
+    await supabase
+      .from("compras_pendientes")
+      .update({ usada_en: new Date().toISOString(), referencia_pago_online: referencia })
+      .eq("id", compraId)
+      .is("usada_en", null);
   }
 
   if (entradasParaEmail.length === 0) {

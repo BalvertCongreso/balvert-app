@@ -89,6 +89,7 @@ export default function CongresoPage() {
               <tr>
                 <th className="px-4 py-3">Nombre</th>
                 <th className="px-4 py-3">Tipo de acceso</th>
+                <th className="px-4 py-3">Colegiado</th>
                 <th className="px-4 py-3">Menú</th>
                 <th className="px-4 py-3">Confirmado</th>
                 <th className="px-4 py-3">Entrada enviada</th>
@@ -106,6 +107,20 @@ export default function CongresoPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">{a.tipo_acceso ?? "—"}</td>
+                  <td className="px-4 py-3">
+                    {a.colegiado_profesional ? (
+                      <>
+                        ✅
+                        <span className="block text-xs text-zinc-500">
+                          {[a.nombre_colegio, a.numero_colegiado && `nº ${a.numero_colegiado}`]
+                            .filter(Boolean)
+                            .join(" · ") || "(sin colegio ni número)"}
+                        </span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td className="px-4 py-3">{a.menu ?? "—"}</td>
                   <td className="px-4 py-3">{a.confirmado ?? "—"}</td>
                   <td className="px-4 py-3">{a.entrada_enviada ?? "—"}</td>
@@ -128,7 +143,7 @@ export default function CongresoPage() {
               ))}
               {!cargando && asistentes.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-zinc-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-zinc-500">
                     Todavía no hay asistentes al congreso. Añade el primero con el
                     botón de arriba.
                   </td>

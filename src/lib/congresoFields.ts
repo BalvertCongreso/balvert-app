@@ -28,6 +28,19 @@ export const seccionesCongreso: SeccionDef[] = [
     ],
   },
   {
+    titulo: "Colegiado profesional",
+    campos: [
+      {
+        key: "colegiado_profesional",
+        label: "Colegiado profesional",
+        tipo: "booleano",
+        nota: "Si viene de la compra online, se cobró al precio de colegiado. Comprueba que el número es real.",
+      },
+      { key: "nombre_colegio", label: "Colegio", tipo: "texto" },
+      { key: "numero_colegiado", label: "Número de colegiado", tipo: "texto" },
+    ],
+  },
+  {
     titulo: "Catering y confirmación",
     campos: [
       { key: "menu", label: "Menú", tipo: "select", opciones: ["Carne", "Pescado", "Vegetariano", "Vegano"] },

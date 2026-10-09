@@ -8,7 +8,7 @@ function valoresIniciales(secciones: SeccionDef[]): Record<string, string> {
   const valores: Record<string, string> = {};
   for (const seccion of secciones) {
     for (const campo of seccion.campos) {
-      valores[campo.key] = "";
+      valores[campo.key] = campo.tipo === "booleano" ? "false" : "";
     }
   }
   return valores;
@@ -16,9 +16,9 @@ function valoresIniciales(secciones: SeccionDef[]): Record<string, string> {
 
 interface Props {
   secciones: SeccionDef[];
-  valoresPrevios?: Record<string, string | number | null>;
+  valoresPrevios?: Record<string, string | number | boolean | null>;
   guardando: boolean;
-  onGuardar: (datos: Record<string, string | number | null>) => void;
+  onGuardar: (datos: Record<string, string | number | boolean | null>) => void;
   textoBoton: string;
 }
 
@@ -32,13 +32,20 @@ export default function InscripcionForm({
   const camposNumericos = new Set(
     secciones.flatMap((s) => s.campos.filter((c) => c.tipo === "numero").map((c) => c.key))
   );
+  const camposBooleanos = new Set(
+    secciones.flatMap((s) => s.campos.filter((c) => c.tipo === "booleano").map((c) => c.key))
+  );
 
   const [valores, setValores] = useState<Record<string, string>>(() => {
     const base = valoresIniciales(secciones);
     if (valoresPrevios) {
       for (const key of Object.keys(base)) {
         const v = valoresPrevios[key];
-        base[key] = v === null || v === undefined ? "" : String(v);
+        if (camposBooleanos.has(key)) {
+          base[key] = v ? "true" : "false";
+        } else {
+          base[key] = v === null || v === undefined ? "" : String(v);
+        }
       }
     }
     return base;
@@ -54,9 +61,11 @@ export default function InscripcionForm({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const datos: Record<string, string | number | null> = {};
+    const datos: Record<string, string | number | boolean | null> = {};
     for (const [key, value] of Object.entries(valores)) {
-      if (value === "") {
+      if (camposBooleanos.has(key)) {
+        datos[key] = value === "true";
+      } else if (value === "") {
         datos[key] = null;
       } else if (camposNumericos.has(key)) {
         datos[key] = Number(value);
@@ -88,12 +97,24 @@ export default function InscripcionForm({
             {seccion.campos.map((campo) => (
               <div
                 key={campo.key}
-                className={campo.tipo === "texto-largo" ? "sm:col-span-2" : ""}
+                className={campo.tipo === "texto-largo" || campo.tipo === "booleano" ? "sm:col-span-2" : ""}
               >
-                <label className="campo-label" htmlFor={campo.key}>
-                  {campo.label}
-                </label>
-                {campo.tipo === "select" ? (
+                {campo.tipo !== "booleano" && (
+                  <label className="campo-label" htmlFor={campo.key}>
+                    {campo.label}
+                  </label>
+                )}
+                {campo.tipo === "booleano" ? (
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      id={campo.key}
+                      type="checkbox"
+                      checked={valores[campo.key] === "true"}
+                      onChange={(e) => actualizar(campo.key, e.target.checked ? "true" : "false")}
+                    />
+                    {campo.label}
+                  </label>
+                ) : campo.tipo === "select" ? (
                   <select
                     id={campo.key}
                     className="campo-input"

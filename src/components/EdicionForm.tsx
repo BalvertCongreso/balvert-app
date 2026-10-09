@@ -4,7 +4,7 @@ import { useState } from "react";
 import { seccionesEdicion } from "@/lib/edicionFields";
 import type { EdicionInput } from "@/types/database";
 
-const camposNumericos = new Set(["anio", "precio_congreso", "precio_gala", "precio_excursion"]);
+const camposNumericos = new Set(["anio", "precio_congreso", "precio_gala", "precio_excursion", "precio_congreso_colegiado"]);
 const camposBooleanos = new Set(["activa"]);
 
 function valorParaInput(valor: string | number | boolean | null | undefined, esFechaHora: boolean): string {

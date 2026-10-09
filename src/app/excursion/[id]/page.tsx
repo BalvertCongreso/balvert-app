@@ -34,7 +34,7 @@ export default function EditarAsistenteExcursionPage() {
     cargar();
   }, [id]);
 
-  async function guardar(datos: Record<string, string | number | null>) {
+  async function guardar(datos: Record<string, string | number | boolean | null>) {
     setGuardando(true);
     const { error } = await supabase.from("excursion").update(datos).eq("id", id);
     setGuardando(false);

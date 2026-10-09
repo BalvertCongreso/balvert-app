@@ -14,12 +14,41 @@ const SECCIONES: { tipo: Tipo; titulo: string }[] = [
 
 const euros = (n: number) => n.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
 
+const MENUS = ["Carne", "Pescado", "Vegetariano", "Vegano"] as const;
+
+// Mismos topes que comprueba /api/stripe/crear-sesion.
+const MAX_NOMBRE = 150;
+const MAX_ALERGIAS = 500;
+const MAX_COLEGIO = 150;
+const MAX_NUMERO_COLEGIADO = 50;
+
 interface Precios {
   edicionNombre: string | null;
   precioCongreso: number | null;
   precioGala: number | null;
   precioExcursion: number | null;
+  precioCongresoColegiado: number | null;
 }
+
+interface Persona {
+  nombre: string;
+  // Gala
+  menu: string;
+  alergias: string;
+  // Congreso
+  colegiado: boolean;
+  colegio: string;
+  numeroColegiado: string;
+}
+
+const personaVacia = (): Persona => ({
+  nombre: "",
+  menu: "",
+  alergias: "",
+  colegiado: false,
+  colegio: "",
+  numeroColegiado: "",
+});
 
 const CAMPO_PRECIO: Record<Tipo, "precioCongreso" | "precioGala" | "precioExcursion"> = {
   congreso: "precioCongreso",
@@ -27,18 +56,25 @@ const CAMPO_PRECIO: Record<Tipo, "precioCongreso" | "precioGala" | "precioExcurs
   excursion: "precioExcursion",
 };
 
+const hayPrecio = (p: number | null | undefined): p is number => p !== null && p !== undefined && p > 0;
+
 function SeccionTipo({
+  tipo,
   titulo,
   precio,
-  nombres,
+  precioColegiado,
+  personas,
   onCambiar,
 }: {
+  tipo: Tipo;
   titulo: string;
   precio: number | null;
-  nombres: string[];
-  onCambiar: (nombres: string[]) => void;
+  // Solo Congreso; null = no se ofrece la casilla "Soy colegiado".
+  precioColegiado: number | null;
+  personas: Persona[];
+  onCambiar: (personas: Persona[]) => void;
 }) {
-  if (precio === null || precio <= 0) {
+  if (!hayPrecio(precio)) {
     return (
       <div className="rounded-md border border-[var(--borde)] bg-zinc-50 p-4">
         <p className="text-sm font-semibold text-zinc-500">{titulo}</p>
@@ -47,48 +83,114 @@ function SeccionTipo({
     );
   }
 
-  function actualizarNombre(i: number, valor: string) {
-    const copia = [...nombres];
-    copia[i] = valor;
-    onCambiar(copia);
+  function actualizar(i: number, cambios: Partial<Persona>) {
+    onCambiar(personas.map((p, idx) => (idx === i ? { ...p, ...cambios } : p)));
   }
 
   function quitar(i: number) {
-    onCambiar(nombres.filter((_, idx) => idx !== i));
+    onCambiar(personas.filter((_, idx) => idx !== i));
   }
 
   return (
     <div className="rounded-md border border-[var(--borde)] bg-white p-4">
-      <div className="flex items-baseline justify-between">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
         <p className="text-sm font-semibold text-zinc-800">{titulo}</p>
-        <p className="text-sm text-zinc-500">{euros(precio)} / persona</p>
+        <p className="text-sm text-zinc-500">
+          {euros(precio)} / persona
+          {precioColegiado !== null && ` · ${euros(precioColegiado)} colegiados`}
+        </p>
       </div>
 
-      <div className="mt-3 flex flex-col gap-2">
-        {nombres.map((nombre, i) => (
-          <div key={i} className="flex gap-2">
-            <input
-              type="text"
-              className="campo-input flex-1"
-              placeholder="Nombre completo"
-              value={nombre}
-              onChange={(e) => actualizarNombre(i, e.target.value)}
-            />
-            <button
-              type="button"
-              onClick={() => quitar(i)}
-              className="rounded-md border border-[var(--borde)] px-3 text-sm text-zinc-500 hover:bg-zinc-50"
-              aria-label="Quitar"
-            >
-              ✕
-            </button>
+      <div className="mt-3 flex flex-col gap-3">
+        {personas.map((persona, i) => (
+          <div
+            key={i}
+            className={`flex flex-col gap-2 ${tipo !== "excursion" ? "rounded-md border border-[var(--borde)] p-3" : ""}`}
+          >
+            <div className="flex gap-2">
+              <input
+                type="text"
+                className="campo-input flex-1"
+                placeholder="Nombre completo"
+                maxLength={MAX_NOMBRE}
+                value={persona.nombre}
+                onChange={(e) => actualizar(i, { nombre: e.target.value })}
+              />
+              <button
+                type="button"
+                onClick={() => quitar(i)}
+                className="rounded-md border border-[var(--borde)] px-3 text-sm text-zinc-500 hover:bg-zinc-50"
+                aria-label="Quitar"
+              >
+                ✕
+              </button>
+            </div>
+
+            {tipo === "gala" && (
+              <div className="grid gap-2 sm:grid-cols-[12rem_1fr]">
+                <select
+                  className="campo-input"
+                  aria-label="Menú"
+                  value={persona.menu}
+                  onChange={(e) => actualizar(i, { menu: e.target.value })}
+                >
+                  <option value="">Menú *</option>
+                  {MENUS.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  className="campo-input"
+                  placeholder="Alergias o intolerancias (opcional)"
+                  maxLength={MAX_ALERGIAS}
+                  value={persona.alergias}
+                  onChange={(e) => actualizar(i, { alergias: e.target.value })}
+                />
+              </div>
+            )}
+
+            {tipo === "congreso" && precioColegiado !== null && (
+              <>
+                <label className="flex items-center gap-2 text-sm text-zinc-700">
+                  <input
+                    type="checkbox"
+                    checked={persona.colegiado}
+                    onChange={(e) => actualizar(i, { colegiado: e.target.checked })}
+                  />
+                  Soy colegiado ({euros(precioColegiado)})
+                </label>
+                {persona.colegiado && (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <input
+                      type="text"
+                      className="campo-input"
+                      placeholder="Colegio *"
+                      maxLength={MAX_COLEGIO}
+                      value={persona.colegio}
+                      onChange={(e) => actualizar(i, { colegio: e.target.value })}
+                    />
+                    <input
+                      type="text"
+                      className="campo-input"
+                      placeholder="Número de colegiado *"
+                      maxLength={MAX_NUMERO_COLEGIADO}
+                      value={persona.numeroColegiado}
+                      onChange={(e) => actualizar(i, { numeroColegiado: e.target.value })}
+                    />
+                  </div>
+                )}
+              </>
+            )}
           </div>
         ))}
       </div>
 
       <button
         type="button"
-        onClick={() => onCambiar([...nombres, ""])}
+        onClick={() => onCambiar([...personas, personaVacia()])}
         className="mt-3 text-sm font-medium text-[var(--balvert-azul-oscuro)] hover:underline"
       >
         + Añadir persona
@@ -104,7 +206,7 @@ export default function EntradasPage() {
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
   const [cargo, setCargo] = useState("");
-  const [nombresPorTipo, setNombresPorTipo] = useState<Record<Tipo, string[]>>({
+  const [personasPorTipo, setPersonasPorTipo] = useState<Record<Tipo, Persona[]>>({
     congreso: [],
     gala: [],
     excursion: [],
@@ -127,16 +229,22 @@ export default function EntradasPage() {
     cargar();
   }, []);
 
+  const precioColegiado = hayPrecio(precios?.precioCongresoColegiado) ? precios!.precioCongresoColegiado : null;
+
+  // Personas con nombre (las filas vacías no cuentan). Si la edición no tiene
+  // precio de colegiado, la casilla se ignora aunque se hubiera marcado.
   const gruposActivos = SECCIONES.map((s) => ({
     tipo: s.tipo,
-    nombres: nombresPorTipo[s.tipo].map((n) => n.trim()).filter((n) => n.length > 0),
-  })).filter((g) => g.nombres.length > 0);
+    personas: personasPorTipo[s.tipo]
+      .map((p) => ({ ...p, nombre: p.nombre.trim(), colegiado: s.tipo === "congreso" && precioColegiado !== null && p.colegiado }))
+      .filter((p) => p.nombre.length > 0),
+  })).filter((g) => g.personas.length > 0);
 
   const total =
     precios &&
     gruposActivos.reduce((suma, g) => {
       const precio = precios[CAMPO_PRECIO[g.tipo]] ?? 0;
-      return suma + precio * g.nombres.length;
+      return suma + g.personas.reduce((s, p) => s + (p.colegiado ? precioColegiado ?? 0 : precio), 0);
     }, 0);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -151,11 +259,38 @@ export default function EntradasPage() {
       setError("Añade al menos el nombre de un asistente en algún tipo de entrada.");
       return;
     }
+    for (const g of gruposActivos) {
+      for (const p of g.personas) {
+        if (g.tipo === "gala" && !p.menu) {
+          setError(`Elige el menú de ${p.nombre} para la Gala.`);
+          return;
+        }
+        if (g.tipo === "congreso" && p.colegiado && (!p.colegio.trim() || !p.numeroColegiado.trim())) {
+          setError(`Indica el colegio y el número de colegiado de ${p.nombre}.`);
+          return;
+        }
+      }
+    }
 
     setEnviando(true);
     try {
-      const grupos: Partial<Record<Tipo, string[]>> = {};
-      for (const g of gruposActivos) grupos[g.tipo] = g.nombres;
+      // Solo se mandan los datos de cada persona; el precio lo calcula
+      // siempre el servidor.
+      const grupos: Partial<Record<Tipo, Record<string, unknown>[]>> = {};
+      for (const g of gruposActivos) {
+        grupos[g.tipo] = g.personas.map((p) =>
+          g.tipo === "congreso"
+            ? {
+                nombre: p.nombre,
+                colegiado_profesional: p.colegiado,
+                nombre_colegio: p.colegiado ? p.colegio.trim() : null,
+                numero_colegiado: p.colegiado ? p.numeroColegiado.trim() : null,
+              }
+            : g.tipo === "gala"
+            ? { nombre: p.nombre, menu: p.menu, alergias_intolerancias: p.alergias.trim() }
+            : { nombre: p.nombre }
+        );
+      }
 
       const res = await fetch("/api/stripe/crear-sesion", {
         method: "POST",
@@ -261,10 +396,12 @@ export default function EntradasPage() {
                 : SECCIONES.map((s) => (
                     <SeccionTipo
                       key={s.tipo}
+                      tipo={s.tipo}
                       titulo={s.titulo}
                       precio={precios[CAMPO_PRECIO[s.tipo]]}
-                      nombres={nombresPorTipo[s.tipo]}
-                      onCambiar={(nombres) => setNombresPorTipo((prev) => ({ ...prev, [s.tipo]: nombres }))}
+                      precioColegiado={s.tipo === "congreso" ? precioColegiado : null}
+                      personas={personasPorTipo[s.tipo]}
+                      onCambiar={(personas) => setPersonasPorTipo((prev) => ({ ...prev, [s.tipo]: personas }))}
                     />
                   ))}
             </div>
@@ -292,8 +429,8 @@ export default function EntradasPage() {
         )}
 
         <p className="mt-6 text-xs leading-relaxed text-zinc-400">
-          <strong>Privacidad:</strong> los datos de este formulario (email, teléfono, empresa y
-          nombres de los asistentes) se usan únicamente para gestionar tu compra y el envío de
+          <strong>Privacidad:</strong> los datos de este formulario (email, teléfono, empresa,
+          nombres de los asistentes, menú, alergias o intolerancias y datos de colegiado) se usan únicamente para gestionar tu compra y el envío de
           las entradas de BALVERT 2027. Responsable del tratamiento: Garimper 22, organizadora
           del congreso. No se comparten con terceros ajenos a la organización del evento.
         </p>

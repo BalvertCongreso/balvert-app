@@ -4,14 +4,14 @@ import { crearClienteServicio } from "@/lib/supabaseServidor";
 // Lectura pública (sin sesión) de los precios de la edición activa, para que
 // el formulario /entradas sepa qué secciones mostrar habilitadas. anon no
 // tiene permiso de lectura sobre "ediciones" (ver 009_revertir_rls_publica.sql),
-// así que esto usa la clave de servicio y solo expone los 3 campos de precio
+// así que esto usa la clave de servicio y solo expone los campos de precio
 // y el nombre — nada más de la tabla.
 export async function GET() {
   const supabase = crearClienteServicio();
 
   const { data: edicion, error } = await supabase
     .from("ediciones")
-    .select("id, nombre, precio_congreso, precio_gala, precio_excursion")
+    .select("id, nombre, precio_congreso, precio_gala, precio_excursion, precio_congreso_colegiado")
     .eq("activa", true)
     .maybeSingle();
 
@@ -27,5 +27,6 @@ export async function GET() {
     precioCongreso: edicion.precio_congreso,
     precioGala: edicion.precio_gala,
     precioExcursion: edicion.precio_excursion,
+    precioCongresoColegiado: edicion.precio_congreso_colegiado,
   });
 }
