@@ -48,6 +48,16 @@ export async function POST(req: Request) {
   }
 
   const session = event.data.object as Stripe.Checkout.Session;
+
+  // Cinturón de seguridad: "completed" no siempre significa cobrado (con
+  // métodos de pago diferidos, como una domiciliación, llega antes de que
+  // entre el dinero). Sin cobro confirmado no se crea nada ni se marca la
+  // compra; se responde 200 para que Stripe no reintente en bucle.
+  if (session.payment_status !== "paid") {
+    console.error(`Webhook Stripe: sesión ${session.id} completada sin cobrar (payment_status ${session.payment_status}); no se crean entradas`);
+    return NextResponse.json({ recibido: true, sin_cobrar: true });
+  }
+
   const compraId = session.metadata?.compra_pendiente_id || null;
   if (!compraId) {
     return NextResponse.json({ error: "La sesión no trae compra_pendiente_id." }, { status: 400 });
