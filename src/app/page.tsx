@@ -80,6 +80,7 @@ function Fila({ label, valor }: { label: string; valor: string | number }) {
 
 export default function Dashboard() {
   const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [edicion, setEdicion] = useState<Edicion | null>(null);
   const [patrocinadores, setPatrocinadores] = useState<Patrocinador[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
@@ -92,19 +93,20 @@ export default function Dashboard() {
   useEffect(() => {
     async function cargar() {
       setCargando(true);
+      setError(null);
       const edicionActiva = await obtenerEdicionActiva();
       setEdicion(edicionActiva);
 
       const edId = edicionActiva?.id;
 
       const [
-        { data: pat },
-        { data: prov },
-        { data: cong },
-        { data: gal },
-        { data: exc },
-        { data: tar },
-        { data: not },
+        { data: pat, error: errorPat },
+        { data: prov, error: errorProv },
+        { data: cong, error: errorCong },
+        { data: gal, error: errorGal },
+        { data: exc, error: errorExc },
+        { data: tar, error: errorTar },
+        { data: not, error: errorNot },
       ] = await Promise.all([
         edId
           ? supabase.from("patrocinadores").select("*").eq("edicion_id", edId)
@@ -130,6 +132,12 @@ export default function Dashboard() {
           .order("fecha_creacion", { ascending: false })
           .limit(5),
       ]);
+
+      const primerError =
+        errorPat || errorProv || errorCong || errorGal || errorExc || errorTar || errorNot;
+      if (primerError) {
+        setError(primerError.message);
+      }
 
       setPatrocinadores(pat ?? []);
       setProveedores(prov ?? []);
@@ -236,6 +244,12 @@ export default function Dashboard() {
             : "No hay ninguna edición activa. Marca una edición como activa para ver el resumen."}
         </p>
       </div>
+
+      {error && (
+        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          No se pudieron cargar algunos datos del dashboard: {error}
+        </div>
+      )}
 
       <EnlaceInscripcion />
 

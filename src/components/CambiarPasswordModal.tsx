@@ -2,12 +2,15 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/context/AuthContext";
 
 interface Props {
   onCerrar: () => void;
 }
 
 export default function CambiarPasswordModal({ onCerrar }: Props) {
+  const { session } = useAuth();
+  const [passwordActual, setPasswordActual] = useState("");
   const [password, setPassword] = useState("");
   const [confirmar, setConfirmar] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -18,6 +21,11 @@ export default function CambiarPasswordModal({ onCerrar }: Props) {
     e.preventDefault();
     setError(null);
 
+    const email = session?.user?.email;
+    if (!email) {
+      setError("No se ha podido identificar la sesión actual.");
+      return;
+    }
     if (password.length < 6) {
       setError("La contraseña debe tener al menos 6 caracteres.");
       return;
@@ -28,6 +36,19 @@ export default function CambiarPasswordModal({ onCerrar }: Props) {
     }
 
     setGuardando(true);
+
+    // Se comprueba la contraseña actual volviendo a iniciar sesión con ella
+    // antes de cambiarla; si no coincide, no se toca nada.
+    const { error: errorActual } = await supabase.auth.signInWithPassword({
+      email,
+      password: passwordActual,
+    });
+    if (errorActual) {
+      setGuardando(false);
+      setError("La contraseña actual no es correcta.");
+      return;
+    }
+
     const { error } = await supabase.auth.updateUser({ password });
     setGuardando(false);
 
@@ -58,6 +79,20 @@ export default function CambiarPasswordModal({ onCerrar }: Props) {
 
         {!mensaje && (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div>
+              <label className="campo-label" htmlFor="password-actual">
+                Contraseña actual
+              </label>
+              <input
+                id="password-actual"
+                type="password"
+                required
+                autoComplete="current-password"
+                className="campo-input"
+                value={passwordActual}
+                onChange={(e) => setPasswordActual(e.target.value)}
+              />
+            </div>
             <div>
               <label className="campo-label" htmlFor="password-nueva">
                 Contraseña nueva

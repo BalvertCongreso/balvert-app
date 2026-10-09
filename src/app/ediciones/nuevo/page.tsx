@@ -15,18 +15,31 @@ export default function NuevaEdicionPage() {
   async function guardar(datos: EdicionInput) {
     setGuardando(true);
 
-    // Si se marca esta edición como activa desde el alta, desmarcamos las
-    // demás primero para que nunca haya dos activas a la vez.
-    if (datos.activa) {
-      await supabase.from("ediciones").update({ activa: false }).neq("id", "00000000-0000-0000-0000-000000000000");
-    }
-
-    const { error } = await supabase.from("ediciones").insert(datos);
-    setGuardando(false);
+    const { data: creada, error } = await supabase
+      .from("ediciones")
+      .insert(datos)
+      .select("id")
+      .single();
     if (error) {
+      setGuardando(false);
       setError(error.message);
       return;
     }
+
+    // Si se marca esta edición como activa desde el alta, se desmarcan las
+    // demás con la función atómica (nunca deja la app sin ninguna activa).
+    if (datos.activa && creada) {
+      const { error: errorActivar } = await supabase.rpc("activar_edicion", {
+        edicion_id: creada.id,
+      });
+      if (errorActivar) {
+        setGuardando(false);
+        setError(errorActivar.message);
+        return;
+      }
+    }
+
+    setGuardando(false);
     router.push("/ediciones");
   }
 

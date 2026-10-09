@@ -33,19 +33,12 @@ export default function EdicionesPage() {
 
   async function marcarActiva(id: string) {
     setMarcando(id);
-    // Sin transacciones desde el cliente: primero desmarcamos todas, luego
-    // marcamos la elegida, para que nunca haya dos ediciones activas a la vez.
-    const { error: errorDesmarcar } = await supabase
-      .from("ediciones")
-      .update({ activa: false })
-      .neq("id", id);
-    const { error: errorMarcar } = await supabase
-      .from("ediciones")
-      .update({ activa: true })
-      .eq("id", id);
+    // Operación atómica en la base de datos (función activar_edicion): nunca
+    // puede quedar a medias sin ninguna edición activa.
+    const { error } = await supabase.rpc("activar_edicion", { edicion_id: id });
 
-    if (errorDesmarcar || errorMarcar) {
-      alert("No se pudo cambiar la edición activa: " + (errorDesmarcar || errorMarcar)?.message);
+    if (error) {
+      alert("No se pudo cambiar la edición activa: " + error.message);
     } else {
       setEdiciones((prev) => prev.map((e) => ({ ...e, activa: e.id === id })));
     }

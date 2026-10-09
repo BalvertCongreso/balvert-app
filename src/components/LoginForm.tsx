@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import RecuperarPasswordModal from "@/components/RecuperarPasswordModal";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [recuperarAbierto, setRecuperarAbierto] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -89,7 +91,18 @@ export default function LoginForm() {
         >
           {enviando ? "Entrando…" : "Entrar"}
         </button>
+        <button
+          type="button"
+          onClick={() => setRecuperarAbierto(true)}
+          className="text-center text-sm text-[var(--balvert-azul-oscuro)] hover:underline"
+        >
+          ¿Olvidaste tu contraseña?
+        </button>
       </form>
+
+      {recuperarAbierto && (
+        <RecuperarPasswordModal onCerrar={() => setRecuperarAbierto(false)} />
+      )}
     </div>
   );
 }

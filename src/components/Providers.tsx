@@ -11,6 +11,7 @@ const RUTAS_PUBLICAS: string[] = [
   "/entradas",
   "/entradas/gracias",
   "/entradas/cancelado",
+  "/restablecer-contrasena",
 ];
 
 // Rutas que ocupan todo el ancho de pantalla en vez del max-w-6xl centrado habitual.

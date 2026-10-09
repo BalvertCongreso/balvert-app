@@ -35,8 +35,18 @@ export default function EditarEdicionPage() {
   async function guardar(datos: EdicionInput) {
     setGuardando(true);
 
+    // Si se marca esta edición como activa, se hace primero con la función
+    // atómica (nunca deja la app sin ninguna edición activa) y luego se
+    // guardan el resto de campos.
     if (datos.activa) {
-      await supabase.from("ediciones").update({ activa: false }).neq("id", id as string);
+      const { error: errorActivar } = await supabase.rpc("activar_edicion", {
+        edicion_id: id,
+      });
+      if (errorActivar) {
+        setGuardando(false);
+        setError(errorActivar.message);
+        return;
+      }
     }
 
     const { error } = await supabase.from("ediciones").update(datos).eq("id", id);
