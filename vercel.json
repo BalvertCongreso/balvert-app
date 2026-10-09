@@ -1,0 +1,3 @@
+{
+  "crons": [{ "path": "/api/limpieza/compras-pendientes", "schedule": "0 4 * * *" }]
+}

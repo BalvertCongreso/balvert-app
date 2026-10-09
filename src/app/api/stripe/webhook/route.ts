@@ -5,7 +5,7 @@ import { crearClienteServicio } from "@/lib/supabaseServidor";
 import { crearClienteStripe } from "@/lib/stripe";
 import { enviarEmailConVariasEntradas, type EntradaParaEmail } from "@/lib/entradaEmail";
 import { NOMBRE_TABLA_SQL, construirDatosEntrada, type Tabla } from "@/lib/entradaDatos";
-import type { GruposCompra, PersonaCongreso, PersonaGala } from "@/lib/compraPendiente";
+import { gruposSinDocumentos, type GruposCompra, type PersonaCongreso, type PersonaGala } from "@/lib/compraPendiente";
 
 export const runtime = "nodejs";
 
@@ -210,10 +210,17 @@ export async function POST(req: Request) {
   // protección real contra duplicados sigue siendo la comprobación por
   // referencia_pago_online de cada tabla (así un reenvío puede completar
   // una tabla que falló sin duplicar las que ya se crearon).
+  // Al marcarla se quitan también los documentos de identidad de la copia
+  // (ya están en las filas reales). Si algo falló, no se toca nada: el
+  // reintento necesita la compra completa.
   if (!huboFallos) {
     await supabase
       .from("compras_pendientes")
-      .update({ usada_en: new Date().toISOString(), referencia_pago_online: referencia })
+      .update({
+        usada_en: new Date().toISOString(),
+        referencia_pago_online: referencia,
+        grupos: gruposSinDocumentos(gruposCompra),
+      })
       .eq("id", compraId)
       .is("usada_en", null);
   }

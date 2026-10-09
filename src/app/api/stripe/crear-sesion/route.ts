@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { crearClienteServicio } from "@/lib/supabaseServidor";
 import { crearClienteStripe } from "@/lib/stripe";
 import type Stripe from "stripe";
-import { MENUS, type GruposCompra } from "@/lib/compraPendiente";
+import { MENUS, borrarComprasSinPagarCaducadas, type GruposCompra } from "@/lib/compraPendiente";
 import { AYUDA_DOCUMENTO, NOMBRE_DOCUMENTO, esTipoDocumento, nombreTieneApellidos, validarDocumento } from "@/lib/documentoIdentidad";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -263,6 +263,11 @@ export async function POST(req: Request) {
     console.error("crear-sesion: no se pudo guardar la compra pendiente", errorCompra?.code, errorCompra?.message);
     return NextResponse.json({ error: "No se pudo iniciar el pago. Inténtalo de nuevo." }, { status: 500 });
   }
+
+  // Limpieza oportunista: cada compra nueva aprovecha para borrar las que
+  // nadie pagó hace más de 7 días (el cron diario de
+  // /api/limpieza/compras-pendientes hace lo mismo aunque no haya compras).
+  await borrarComprasSinPagarCaducadas(supabase);
 
   const origin = req.headers.get("origin") || new URL(req.url).origin;
   const stripe = crearClienteStripe();
