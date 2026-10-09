@@ -36,7 +36,7 @@ const FONT_FAMILY = "Inter";
 export interface DatosEntrada {
   qrPayload: string;
   nombreAsistente: string | null;
-  evento: "Congreso" | "Gala" | "Excursión";
+  evento: "Congreso" | "Cena de gala" | "Excursión";
   edicionNombre: string | null;
   empresa: string | null;
   categoriaPatrocinio: string | null;

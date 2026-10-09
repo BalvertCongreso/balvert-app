@@ -148,6 +148,7 @@ export async function POST(req: Request) {
         fila = {
           ...filaComun,
           nombre: p.nombre,
+          documento_identidad: p.documento_identidad,
           email: compradorEmail,
           telefono: compradorTelefono,
           tipo_acceso: "Independiente" as const,
@@ -161,6 +162,7 @@ export async function POST(req: Request) {
         fila = {
           ...filaComun,
           nombre_asistente: p.nombre,
+          documento_identidad: p.documento_identidad,
           email_asistente: compradorEmail,
           tipo_entrada: "Comprada" as const,
           precio_entrada: p.precio,
@@ -171,6 +173,7 @@ export async function POST(req: Request) {
         fila = {
           ...filaComun,
           nombre_asistente: persona.nombre,
+          documento_identidad: persona.documento_identidad,
           email_asistente: compradorEmail,
           tipo_entrada: "Comprada (10€)" as const,
           precio: persona.precio,
@@ -184,7 +187,13 @@ export async function POST(req: Request) {
         .single();
 
       if (errorInsercion || !filaInsertada) {
-        console.error(`Webhook Stripe: fallo al crear entrada en ${tablaSql} (referencia ${referencia})`, errorInsercion);
+        // Solo código y mensaje: el "details" de Postgres puede incluir la
+        // fila entera (con el documento de identidad).
+        console.error(
+          `Webhook Stripe: fallo al crear entrada en ${tablaSql} (referencia ${referencia})`,
+          errorInsercion?.code,
+          errorInsercion?.message
+        );
         huboFallos = true;
         continue;
       }

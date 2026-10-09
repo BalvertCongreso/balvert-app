@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { nombreTieneApellidos, validarDocumento } from "@/lib/documentoIdentidad";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -8,7 +9,7 @@ type Tipo = "congreso" | "gala" | "excursion";
 
 const SECCIONES: { tipo: Tipo; titulo: string }[] = [
   { tipo: "congreso", titulo: "Congreso" },
-  { tipo: "gala", titulo: "Gala" },
+  { tipo: "gala", titulo: "Cena de gala" },
   { tipo: "excursion", titulo: "Excursión" },
 ];
 
@@ -32,6 +33,7 @@ interface Precios {
 
 interface Persona {
   nombre: string;
+  documento: string;
   // Gala
   menu: string;
   alergias: string;
@@ -43,6 +45,7 @@ interface Persona {
 
 const personaVacia = (): Persona => ({
   nombre: "",
+  documento: "",
   menu: "",
   alergias: "",
   colegiado: false,
@@ -111,7 +114,7 @@ function SeccionTipo({
               <input
                 type="text"
                 className="campo-input flex-1"
-                placeholder="Nombre completo"
+                placeholder="Nombre y apellidos *"
                 maxLength={MAX_NOMBRE}
                 value={persona.nombre}
                 onChange={(e) => actualizar(i, { nombre: e.target.value })}
@@ -125,6 +128,17 @@ function SeccionTipo({
                 ✕
               </button>
             </div>
+
+            <input
+              type="text"
+              className="campo-input"
+              placeholder="Documento de identidad (DNI, NIE o pasaporte) *"
+              aria-label="Documento de identidad (DNI, NIE o pasaporte)"
+              autoComplete="off"
+              maxLength={30}
+              value={persona.documento}
+              onChange={(e) => actualizar(i, { documento: e.target.value })}
+            />
 
             {tipo === "gala" && (
               <div className="grid gap-2 sm:grid-cols-[12rem_1fr]">
@@ -261,8 +275,23 @@ export default function EntradasPage() {
     }
     for (const g of gruposActivos) {
       for (const p of g.personas) {
+        const seccion = SECCIONES.find((s) => s.tipo === g.tipo)!.titulo;
+        if (!nombreTieneApellidos(p.nombre)) {
+          setError(`Escribe nombre y apellidos de "${p.nombre}" en ${seccion}.`);
+          return;
+        }
+        if (!p.documento.trim()) {
+          setError(`Indica el documento de identidad de ${p.nombre} (${seccion}).`);
+          return;
+        }
+        if (!validarDocumento(p.documento)) {
+          setError(
+            `El documento de identidad de ${p.nombre} (${seccion}) no es válido. Revisa el DNI/NIE (la letra debe ser la correcta) o el pasaporte.`
+          );
+          return;
+        }
         if (g.tipo === "gala" && !p.menu) {
-          setError(`Elige el menú de ${p.nombre} para la Gala.`);
+          setError(`Elige el menú de ${p.nombre} para la Cena de gala.`);
           return;
         }
         if (g.tipo === "congreso" && p.colegiado && (!p.colegio.trim() || !p.numeroColegiado.trim())) {
@@ -282,13 +311,14 @@ export default function EntradasPage() {
           g.tipo === "congreso"
             ? {
                 nombre: p.nombre,
+                documento_identidad: p.documento,
                 colegiado_profesional: p.colegiado,
                 nombre_colegio: p.colegiado ? p.colegio.trim() : null,
                 numero_colegiado: p.colegiado ? p.numeroColegiado.trim() : null,
               }
             : g.tipo === "gala"
-            ? { nombre: p.nombre, menu: p.menu, alergias_intolerancias: p.alergias.trim() }
-            : { nombre: p.nombre }
+            ? { nombre: p.nombre, documento_identidad: p.documento, menu: p.menu, alergias_intolerancias: p.alergias.trim() }
+            : { nombre: p.nombre, documento_identidad: p.documento }
         );
       }
 
@@ -331,7 +361,7 @@ export default function EntradasPage() {
           </div>
         </div>
 
-        <h1 className="mb-1 text-lg font-semibold text-zinc-800">Congreso, Gala y Excursión</h1>
+        <h1 className="mb-1 text-lg font-semibold text-zinc-800">Congreso, Cena de gala y Excursión</h1>
         <p className="mb-6 text-sm text-zinc-600">
           Compra entradas para uno o varios de los eventos en un solo pago. Recibirás todas las
           entradas con código QR por email.
@@ -430,9 +460,13 @@ export default function EntradasPage() {
 
         <p className="mt-6 text-xs leading-relaxed text-zinc-400">
           <strong>Privacidad:</strong> los datos de este formulario (email, teléfono, empresa,
-          nombres de los asistentes, menú, alergias o intolerancias y datos de colegiado) se usan únicamente para gestionar tu compra y el envío de
-          las entradas de BALVERT 2027. Responsable del tratamiento: Garimper 22, organizadora
-          del congreso. No se comparten con terceros ajenos a la organización del evento.
+          nombres y apellidos de los asistentes, menú, alergias o intolerancias y datos de
+          colegiado) se usan únicamente para gestionar tu compra y el envío de las entradas de
+          BALVERT 2027. El documento de identidad (DNI, NIE o pasaporte) de cada asistente se
+          recoge para identificarle en el acceso, emitir el justificante o certificado de
+          asistencia y para la facturación. Responsable del tratamiento: Garimper 22,
+          organizadora del congreso. No se comparten con terceros ajenos a la organización del
+          evento.
         </p>
       </div>
     </div>

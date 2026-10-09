@@ -140,6 +140,7 @@ export interface AsistenteCongreso {
   id: string;
   edicion_id: string | null;
   nombre: string | null;
+  documento_identidad: string | null;
   email: string | null;
   telefono: string | null;
   cargo: string | null;
@@ -174,6 +175,7 @@ export interface Gala {
   empresa_entidad: string | null;
   categoria_patrocinio: string | null;
   nombre_asistente: string | null;
+  documento_identidad: string | null;
   email_asistente: string | null;
   cargo: string | null;
   tipo_entrada: "Incluida en patrocinio" | "Comprada" | "Invitación organización" | null;
@@ -198,6 +200,7 @@ export interface Excursion {
   empresa_entidad: string | null;
   categoria_patrocinio: string | null;
   nombre_asistente: string | null;
+  documento_identidad: string | null;
   email_asistente: string | null;
   cargo: string | null;
   tipo_entrada:

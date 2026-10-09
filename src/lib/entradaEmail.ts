@@ -1,13 +1,19 @@
 import { Resend } from "resend";
 import { construirImagenEntrada, type DatosEntrada } from "@/lib/entradaImagen";
 
+// "el congreso", "la cena de gala", "la excursión".
+function conArticulo(evento: string) {
+  const enMinusculas = evento.toLowerCase();
+  return `${enMinusculas === "congreso" ? "el" : "la"} ${enMinusculas}`;
+}
+
 function construirEmailHtml(nombre: string | null, evento: string) {
   return `
   <div style="font-family: -apple-system, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; color: #1f2937;">
     <h1 style="color: #8B6914; font-size: 20px; margin-bottom: 4px;">BALVERT 2027</h1>
     <p style="color: #5BB8E8; font-weight: 600; margin-top: 0;">Tu entrada — ${evento}</p>
     <p>Hola${nombre ? ` ${nombre}` : ""},</p>
-    <p>Aquí tienes tu entrada para el ${evento.toLowerCase()} de BALVERT 2027. Preséntala (en el móvil o impresa) en el acceso; se validará escaneando el código.</p>
+    <p>Aquí tienes tu entrada para ${conArticulo(evento)} de BALVERT 2027. Preséntala (en el móvil o impresa) en el acceso; se validará escaneando el código.</p>
     <div style="text-align: center; margin: 24px 0;">
       <img src="cid:entrada-balvert" alt="Tu entrada BALVERT 2027" width="350" style="border: 1px solid #e5e7eb; border-radius: 12px;" />
     </div>
@@ -94,7 +100,7 @@ export async function enviarEmailConEntrada(
 }
 
 // Compra combinada (Fase 7c): una misma compra por Stripe puede generar
-// varias entradas a la vez (de un tipo o de varios: Congreso, Gala,
+// varias entradas a la vez (de un tipo o de varios: Congreso, Cena de gala,
 // Excursión). Se manda UN solo email al comprador con todas las imágenes
 // adjuntas, en vez de un email por entrada.
 export async function enviarEmailConVariasEntradas(email: string, entradas: EntradaParaEmail[]): Promise<ResultadoEnvio> {

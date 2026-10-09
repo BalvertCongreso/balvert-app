@@ -6,6 +6,12 @@ export const seccionesExcursion: SeccionDef[] = [
     campos: [
       { key: "nombre_asistente", label: "Nombre", tipo: "texto" },
       {
+        key: "documento_identidad",
+        label: "Documento de identidad",
+        tipo: "texto",
+        nota: "DNI, NIE o pasaporte. Obligatorio en la compra online; opcional en altas manuales e invitaciones.",
+      },
+      {
         key: "email_asistente",
         label: "Email",
         tipo: "email",

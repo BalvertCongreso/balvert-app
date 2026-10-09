@@ -3,6 +3,7 @@ import { crearClienteServicio } from "@/lib/supabaseServidor";
 import { crearClienteStripe } from "@/lib/stripe";
 import type Stripe from "stripe";
 import { MENUS, type GruposCompra } from "@/lib/compraPendiente";
+import { nombreTieneApellidos, validarDocumento } from "@/lib/documentoIdentidad";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -15,9 +16,11 @@ const CAMPO_PRECIO: Record<Tipo, "precio_congreso" | "precio_gala" | "precio_exc
   excursion: "precio_excursion",
 };
 
+// Nombres de cara al cliente (mensajes de error y líneas del cargo, que se
+// ven en la página de pago de Stripe): "Gala" se rotula "Cena de gala".
 const NOMBRE_EVENTO: Record<Tipo, string> = {
   congreso: "Congreso",
-  gala: "Gala",
+  gala: "Cena de gala",
   excursion: "Excursión",
 };
 
@@ -55,8 +58,30 @@ function personasCrudas(valor: unknown, tipo: Tipo): Record<string, unknown>[] {
       `Como máximo se pueden comprar ${MAX_PERSONAS_POR_TIPO} entradas de ${NOMBRE_EVENTO[tipo]} de golpe.`
     );
   }
-  for (const p of personas) comprobarLargo(texto(p.nombre), MAX_NOMBRE, "Nombre completo");
+  for (const p of personas) {
+    const nombre = texto(p.nombre);
+    comprobarLargo(nombre, MAX_NOMBRE, "Nombre y apellidos");
+    if (!nombreTieneApellidos(nombre)) {
+      throw new ErrorValidacion(`Escribe nombre y apellidos de "${nombre}" en ${NOMBRE_EVENTO[tipo]}.`);
+    }
+  }
   return personas;
+}
+
+// El mensaje de error nunca incluye el documento, solo el nombre.
+function documentoValido(p: Record<string, unknown>, tipo: Tipo): string {
+  const nombre = texto(p.nombre);
+  const crudo = typeof p.documento_identidad === "string" ? p.documento_identidad : "";
+  if (!crudo.trim()) {
+    throw new ErrorValidacion(`Indica el documento de identidad de ${nombre} (${NOMBRE_EVENTO[tipo]}).`);
+  }
+  const doc = validarDocumento(crudo);
+  if (!doc) {
+    throw new ErrorValidacion(
+      `El documento de identidad de ${nombre} (${NOMBRE_EVENTO[tipo]}) no es válido. Revisa el DNI/NIE (la letra debe ser la correcta) o el pasaporte.`
+    );
+  }
+  return doc;
 }
 
 const precioValido = (p: number | null | undefined): p is number => p !== null && p !== undefined && p > 0;
@@ -120,8 +145,16 @@ export async function POST(req: Request) {
         const precioColegiado = edicion.precio_congreso_colegiado as number | null;
         grupos.congreso = crudas.map((p) => {
           const nombre = texto(p.nombre);
+          const documento_identidad = documentoValido(p, tipo);
           if (p.colegiado_profesional !== true) {
-            return { nombre, colegiado_profesional: false, nombre_colegio: null, numero_colegiado: null, precio };
+            return {
+              nombre,
+              documento_identidad,
+              colegiado_profesional: false,
+              nombre_colegio: null,
+              numero_colegiado: null,
+              precio,
+            };
           }
           // Casilla marcada: solo es válida si la edición tiene precio de
           // colegiado (si no, el formulario ni siquiera la muestra — llegar
@@ -138,6 +171,7 @@ export async function POST(req: Request) {
           comprobarLargo(numero, MAX_NUMERO_COLEGIADO, "Número de colegiado");
           return {
             nombre,
+            documento_identidad,
             colegiado_profesional: true,
             nombre_colegio: colegio,
             numero_colegiado: numero,
@@ -147,16 +181,21 @@ export async function POST(req: Request) {
       } else if (tipo === "gala") {
         grupos.gala = crudas.map((p) => {
           const nombre = texto(p.nombre);
+          const documento_identidad = documentoValido(p, tipo);
           const menu = MENUS.find((m) => m === p.menu);
           if (!menu) {
-            throw new ErrorValidacion(`Elige el menú de ${nombre} para la Gala.`);
+            throw new ErrorValidacion(`Elige el menú de ${nombre} para la Cena de gala.`);
           }
           const alergias = texto(p.alergias_intolerancias);
           comprobarLargo(alergias, MAX_ALERGIAS, "Alergias o intolerancias");
-          return { nombre, menu, alergias_intolerancias: alergias || null, precio };
+          return { nombre, documento_identidad, menu, alergias_intolerancias: alergias || null, precio };
         });
       } else {
-        grupos.excursion = crudas.map((p) => ({ nombre: texto(p.nombre), precio }));
+        grupos.excursion = crudas.map((p) => ({
+          nombre: texto(p.nombre),
+          documento_identidad: documentoValido(p, tipo),
+          precio,
+        }));
       }
     }
   } catch (e) {
@@ -187,7 +226,7 @@ export async function POST(req: Request) {
     if (generales.length) anadirLinea("Entrada Congreso", generales[0].precio, generales.length);
     if (colegiados.length) anadirLinea("Entrada Congreso (colegiado)", colegiados[0].precio, colegiados.length);
   }
-  if (grupos.gala) anadirLinea("Entrada Gala", grupos.gala[0].precio, grupos.gala.length);
+  if (grupos.gala) anadirLinea("Entrada Cena de gala", grupos.gala[0].precio, grupos.gala.length);
   if (grupos.excursion) anadirLinea("Entrada Excursión", grupos.excursion[0].precio, grupos.excursion.length);
 
   if (lineItems.length === 0) {
@@ -216,7 +255,9 @@ export async function POST(req: Request) {
     .single();
 
   if (errorCompra || !compra) {
-    console.error("crear-sesion: no se pudo guardar la compra pendiente", errorCompra);
+    // Solo código y mensaje: el "details" de Postgres puede incluir la fila
+    // entera (con documentos de identidad).
+    console.error("crear-sesion: no se pudo guardar la compra pendiente", errorCompra?.code, errorCompra?.message);
     return NextResponse.json({ error: "No se pudo iniciar el pago. Inténtalo de nuevo." }, { status: 500 });
   }
 

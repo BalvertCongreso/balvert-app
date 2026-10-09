@@ -15,6 +15,14 @@ export const NOMBRE_EVENTO: Record<Tabla, "Congreso" | "Gala" | "Excursión"> = 
   excursion: "Excursión",
 };
 
+// Lo que ve el cliente en la imagen de la entrada y en el email: "Gala" se
+// rotula "Cena de gala". Las pantallas internas siguen usando NOMBRE_EVENTO.
+export const NOMBRE_EVENTO_CLIENTE: Record<Tabla, "Congreso" | "Cena de gala" | "Excursión"> = {
+  congreso: "Congreso",
+  gala: "Cena de gala",
+  excursion: "Excursión",
+};
+
 const CAMPO_LUGAR: Record<Tabla, string> = {
   congreso: "lugar_congreso",
   gala: "lugar_gala",
@@ -107,7 +115,7 @@ export async function construirDatosEntrada(
   return {
     qrPayload: `${tabla}:${fila.qr_codigo as string}`,
     nombreAsistente: nombre,
-    evento: NOMBRE_EVENTO[tabla],
+    evento: NOMBRE_EVENTO_CLIENTE[tabla],
     edicionNombre,
     empresa,
     categoriaPatrocinio: (fila.categoria_patrocinio as string | null) ?? null,

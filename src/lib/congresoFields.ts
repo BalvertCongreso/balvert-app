@@ -10,6 +10,12 @@ export const seccionesCongreso: SeccionDef[] = [
         tipo: "texto",
         nota: "Puede quedar vacío: es lo normal en una invitación creada desde Patrocinadores antes de saber quién la usará.",
       },
+      {
+        key: "documento_identidad",
+        label: "Documento de identidad",
+        tipo: "texto",
+        nota: "DNI, NIE o pasaporte. Obligatorio en la compra online; opcional en altas manuales e invitaciones.",
+      },
       { key: "email", label: "Email", tipo: "email" },
       { key: "telefono", label: "Teléfono", tipo: "telefono" },
       { key: "cargo", label: "Cargo", tipo: "texto" },
