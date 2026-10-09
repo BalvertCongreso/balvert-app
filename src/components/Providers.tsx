@@ -14,13 +14,21 @@ const RUTAS_PUBLICAS: string[] = [
   "/restablecer-contrasena",
 ];
 
+// Portal de clientes: /portal y todo lo que cuelga de él, sin abrir nada más
+// (p. ej. "/portales" no cuenta). El portal tiene su propia sesión (cookie,
+// ver src/lib/portal.ts), independiente del login del panel interno. Las
+// rutas /api/portal/* no pasan por aquí: cada una comprueba esa sesión.
+function esRutaPortal(pathname: string) {
+  return pathname === "/portal" || pathname.startsWith("/portal/");
+}
+
 // Rutas que ocupan todo el ancho de pantalla en vez del max-w-6xl centrado habitual.
 const RUTAS_ANCHO_COMPLETO: string[] = ["/"];
 
 function Contenido({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { session, cargando } = useAuth();
-  const esRutaPublica = RUTAS_PUBLICAS.includes(pathname ?? "");
+  const esRutaPublica = RUTAS_PUBLICAS.includes(pathname ?? "") || esRutaPortal(pathname ?? "");
   const esAnchoCompleto = RUTAS_ANCHO_COMPLETO.includes(pathname ?? "");
 
   if (esRutaPublica) {
