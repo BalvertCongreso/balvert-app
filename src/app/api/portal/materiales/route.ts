@@ -58,6 +58,12 @@ export async function GET() {
       incluye: campoIncluye ? edicion[campoIncluye] : f.beneficios_incluidos,
       particularesIncluidos: campoIncluye ? f.beneficios_incluidos : null,
       particularesExcluidos: f.beneficios_excluidos,
+      estado: {
+        logoRecibido: f.logo_recibido === "Sí",
+        tienePonencia,
+        ponenciaRecibida: f.ponencia_recibida === "Sí",
+        fechaLimite: f.fecha_limite_materiales,
+      },
       produccion: {
         precioRollup,
         precioVinilado: tieneStand ? precioVinilado : null,

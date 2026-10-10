@@ -12,7 +12,7 @@ import { empresasDelEmail, idEdicionActiva } from "@/lib/portal";
 // Columnas de la ficha que el portal lee (y ninguna más: nada de
 // facturación, contactos ni observaciones internas).
 export const COLUMNAS_FICHA_PORTAL =
-  "id, empresa_entidad, categoria, tiene_stand, tiene_ponencia, ponente_nombre, ponente_cargo, ponencia_titulo, ponencia_duracion_min, rollups_solicitados, rollup_por_nuestra_cuenta, vinilado_por_nuestra_cuenta, beneficios_incluidos, beneficios_excluidos";
+  "id, empresa_entidad, categoria, tiene_stand, tiene_ponencia, ponente_nombre, ponente_cargo, ponencia_titulo, ponencia_duracion_min, rollups_solicitados, rollup_por_nuestra_cuenta, vinilado_por_nuestra_cuenta, beneficios_incluidos, beneficios_excluidos, logo_recibido, ponencia_recibida, fecha_limite_materiales";
 
 export interface FichaPortal {
   id: string;
@@ -29,6 +29,9 @@ export interface FichaPortal {
   vinilado_por_nuestra_cuenta: string | null;
   beneficios_incluidos: string | null;
   beneficios_excluidos: string | null;
+  logo_recibido: string | null;
+  ponencia_recibida: string | null;
+  fecha_limite_materiales: string | null;
 }
 
 export const COLUMNAS_EDICION_MATERIAL =

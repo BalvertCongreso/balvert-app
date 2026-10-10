@@ -1,9 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import PortalMarco from "@/components/PortalMarco";
-import MaterialPatrocinador from "./MaterialPatrocinador";
+import {
+  Aviso,
+  DocumentosOrganizacion,
+  SeccionMaterial,
+  SeccionPatrocinio,
+  obtenerMateriales,
+  type EmpresaMaterial,
+} from "./MaterialPatrocinador";
 import { CAMPOS_FACTURACION, type DatosFacturacion } from "@/lib/factura";
 
 type Tabla = "congreso" | "gala" | "excursion";
@@ -220,9 +227,56 @@ function TarjetaCompra({ compra, onSolicitada }: { compra: CompraPortal; onSolic
   );
 }
 
+type Pestana = "entradas" | "patrocinio" | "material" | "documentos";
+
+const PESTANAS: { id: Pestana; titulo: string; intro: string }[] = [
+  {
+    id: "entradas",
+    titulo: "Mis entradas",
+    intro:
+      "Aquí tienes tus entradas con su código QR (enséñalo en el móvil o impreso al llegar), el recibo de cada pago y la opción de pedir factura.",
+  },
+  {
+    id: "patrocinio",
+    titulo: "Mi patrocinio",
+    intro:
+      "Aquí tienes lo que incluye tu patrocinio y puedes pedirnos que te fabriquemos rollups o el vinilado del mostrador. Los precios no incluyen IVA y se facturan después.",
+  },
+  {
+    id: "material",
+    titulo: "Material",
+    intro:
+      "Aquí puedes enviarnos el logo, la ponencia y los diseños de rollup y vinilado. Cuando subas algo, nos llega un aviso y lo revisamos.",
+  },
+  {
+    id: "documentos",
+    titulo: "Documentos",
+    intro: "Aquí encontrarás los documentos que la organización comparte contigo. Pulsa «Descargar» para guardarlos.",
+  },
+];
+
 export default function PortalInicioPage() {
+  // useSearchParams necesita un Suspense alrededor.
+  return (
+    <Suspense
+      fallback={
+        <PortalMarco subtitulo="Área de clientes" ancho="max-w-3xl">
+          <p className="text-sm text-zinc-500">Cargando…</p>
+        </PortalMarco>
+      }
+    >
+      <AreaCliente />
+    </Suspense>
+  );
+}
+
+function AreaCliente() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [datos, setDatos] = useState<DatosPortal | null>(null);
+  const [empresas, setEmpresas] = useState<EmpresaMaterial[] | null>(null);
+  const [errorEmpresas, setErrorEmpresas] = useState<string | null>(null);
+  const [empresaId, setEmpresaId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saliendo, setSaliendo] = useState(false);
 
@@ -234,11 +288,23 @@ export default function PortalInicioPage() {
           return;
         }
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "No se pudieron cargar tus datos.");
+        if (!res.ok) throw new Error(data.error || "No se pudieron cargar tus datos. Recarga la página.");
         setDatos(data);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Error inesperado."));
+      .catch((e) => setError(e instanceof Error ? e.message : "Error inesperado. Recarga la página."));
+    obtenerMateriales()
+      .then(setEmpresas)
+      .catch((e) => setErrorEmpresas(e instanceof Error ? e.message : "Error inesperado."));
   }, [router]);
+
+  const recargarEmpresas = () => {
+    obtenerMateriales()
+      .then((lista) => {
+        setEmpresas(lista);
+        setErrorEmpresas(null);
+      })
+      .catch((e) => setErrorEmpresas(e instanceof Error ? e.message : "Error inesperado."));
+  };
 
   async function salir() {
     setSaliendo(true);
@@ -251,7 +317,7 @@ export default function PortalInicioPage() {
       type="button"
       onClick={salir}
       disabled={saliendo}
-      className="rounded-md border border-[var(--borde)] px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50 disabled:opacity-60"
+      className="min-h-11 rounded-md border border-[var(--borde)] px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50 disabled:opacity-60"
     >
       Cerrar sesión
     </button>
@@ -260,7 +326,8 @@ export default function PortalInicioPage() {
   if (error) {
     return (
       <PortalMarco subtitulo="Área de clientes" ancho="max-w-3xl" accion={botonSalir}>
-        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+        <Aviso tipo="error">{error}</Aviso>
+        <Contacto />
       </PortalMarco>
     );
   }
@@ -274,7 +341,26 @@ export default function PortalInicioPage() {
   }
 
   const esPatrocinador = datos.empresas.length > 0;
-  const esAsistente = datos.entradas.length > 0;
+  const tieneEntradas = datos.entradas.length > 0 || datos.compras.length > 0;
+  const tieneDocumentos = datos.documentos.length > 0 || (empresas ?? []).some((e) => e.organizacion.length > 0);
+
+  // Qué pestañas ve cada persona: un patrocinador, todas; un asistente,
+  // "Mis entradas" y "Documentos" (o solo la que tenga contenido).
+  let visibles: Pestana[];
+  if (esPatrocinador) visibles = ["entradas", "patrocinio", "material", "documentos"];
+  else if (tieneEntradas && !tieneDocumentos) visibles = ["entradas"];
+  else if (!tieneEntradas && tieneDocumentos) visibles = ["documentos"];
+  else visibles = ["entradas", "documentos"];
+
+  const pedida = searchParams.get("pestana") as Pestana | null;
+  const porDefecto: Pestana = esPatrocinador && !tieneEntradas ? "patrocinio" : visibles[0];
+  const pestana: Pestana = pedida && visibles.includes(pedida) ? pedida : porDefecto;
+  const info = PESTANAS.find((p) => p.id === pestana)!;
+
+  const irA = (p: Pestana) => router.replace(`/portal/inicio?pestana=${p}`, { scroll: false });
+
+  const empresa = empresas?.find((e) => e.id === empresaId) ?? empresas?.[0] ?? null;
+  const usaEmpresa = pestana === "patrocinio" || pestana === "material";
 
   return (
     <PortalMarco
@@ -282,19 +368,87 @@ export default function PortalInicioPage() {
       ancho="max-w-3xl"
       accion={botonSalir}
     >
-      <p className="mb-6 text-sm text-zinc-500">Has entrado como {datos.email}</p>
+      <p className="mb-4 break-words text-sm text-zinc-500">Has entrado como {datos.email}</p>
 
-      {/* Por cada empresa: qué incluye, producción de rollup/vinilado, material y ponente. */}
-      {esPatrocinador && <MaterialPatrocinador />}
+      {visibles.length > 1 && (
+        <nav
+          aria-label="Secciones de tu área"
+          className="-mx-6 mb-5 flex gap-1 overflow-x-auto border-b border-[var(--borde)] px-6 sm:-mx-8 sm:px-8"
+        >
+          {visibles.map((id) => {
+            const activa = id === pestana;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => irA(id)}
+                aria-current={activa ? "page" : undefined}
+                // En móvil la fila se desliza: que la pestaña abierta quede a la vista.
+                ref={activa ? (el) => el?.scrollIntoView({ block: "nearest", inline: "nearest" }) : undefined}
+                className={`min-h-11 shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold ${
+                  activa
+                    ? "border-[var(--balvert-azul-oscuro)] text-[var(--balvert-azul-oscuro)]"
+                    : "border-transparent text-zinc-500 hover:text-zinc-800"
+                }`}
+              >
+                {PESTANAS.find((p) => p.id === id)!.titulo}
+              </button>
+            );
+          })}
+        </nav>
+      )}
 
-      {(esAsistente || !esPatrocinador) && (
-        <section className="mb-8">
-          <h2 className="mb-3 text-base font-semibold text-zinc-800">Mis entradas</h2>
-          {!esAsistente ? (
-            <p className="rounded-md border border-[var(--borde)] bg-zinc-50 p-4 text-sm text-zinc-600">
-              No tienes entradas a tu nombre en esta edición. Si crees que es un error, responde a
-              cualquier email de secretaria@balvert.es.
-            </p>
+      <h2 className="mb-1 text-lg font-semibold text-zinc-800">{info.titulo}</h2>
+      <p className="mb-5 text-sm text-zinc-600">{info.intro}</p>
+
+      {usaEmpresa && empresas && empresas.length > 1 && (
+        <div className="mb-5">
+          <label className="campo-label" htmlFor="selector-empresa">
+            Empresa
+          </label>
+          <select
+            id="selector-empresa"
+            className="campo-input text-base sm:max-w-sm"
+            value={empresa?.id ?? ""}
+            onChange={(e) => setEmpresaId(e.target.value)}
+          >
+            {empresas.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.empresa ?? "Empresa sin nombre"}
+                {e.categoria ? ` (${e.categoria})` : ""}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-zinc-500">Eres contacto de varias empresas: elige con cuál quieres trabajar.</p>
+        </div>
+      )}
+
+      {usaEmpresa && (
+        <>
+          {errorEmpresas && <Aviso tipo="error">{errorEmpresas}</Aviso>}
+          {!empresas && !errorEmpresas && <p className="text-sm text-zinc-500">Cargando…</p>}
+          {empresa && (
+            <div className="mb-4 rounded-md bg-zinc-50 p-3 text-sm">
+              <p className="font-semibold text-zinc-800">{empresa.empresa ?? "Empresa patrocinadora"}</p>
+              {empresa.categoria && <p className="text-zinc-600">Patrocinio: {empresa.categoria}</p>}
+            </div>
+          )}
+          {empresa && pestana === "patrocinio" && (
+            <SeccionPatrocinio key={empresa.id} e={empresa} recargar={recargarEmpresas} />
+          )}
+          {empresa && pestana === "material" && (
+            <SeccionMaterial key={empresa.id} e={empresa} recargar={recargarEmpresas} irAPatrocinio={() => irA("patrocinio")} />
+          )}
+        </>
+      )}
+
+      {pestana === "entradas" && (
+        <div className="flex flex-col gap-8">
+          {datos.entradas.length === 0 ? (
+            <Aviso tipo="info">
+              No tienes entradas a tu nombre en esta edición. Si crees que es un error, escríbenos a
+              secretaria@balvert.es.
+            </Aviso>
           ) : (
             <div className="flex flex-col gap-6">
               {GRUPOS.map(({ tabla, titulo }) => {
@@ -315,64 +469,82 @@ export default function PortalInicioPage() {
               })}
             </div>
           )}
-        </section>
-      )}
 
-      {datos.compras.length > 0 && (
-        <section className="mb-8">
-          <h2 className="mb-1 text-base font-semibold text-zinc-800">Mis compras</h2>
-          <p className="mb-3 text-sm text-zinc-600">
-            Aquí tienes el recibo de cada pago. Si necesitas factura, pídela y te la enviaremos por email.
-          </p>
-          <div className="flex flex-col gap-3">
-            {datos.compras.map((c) => (
-              <TarjetaCompra
-                key={c.referencia}
-                compra={c}
-                onSolicitada={() =>
-                  setDatos((d) =>
-                    d && {
-                      ...d,
-                      compras: d.compras.map((x) =>
-                        x.referencia === c.referencia ? { ...x, facturaSolicitada: new Date().toISOString() } : x
-                      ),
+          {datos.compras.length > 0 && (
+            <section>
+              <h3 className="mb-1 text-base font-semibold text-zinc-800">Mis compras</h3>
+              <p className="mb-3 text-sm text-zinc-600">
+                Aquí tienes el recibo de cada pago. Si necesitas factura, pídela y te la enviaremos por email.
+              </p>
+              <div className="flex flex-col gap-3">
+                {datos.compras.map((c) => (
+                  <TarjetaCompra
+                    key={c.referencia}
+                    compra={c}
+                    onSolicitada={() =>
+                      setDatos(
+                        (d) =>
+                          d && {
+                            ...d,
+                            compras: d.compras.map((x) =>
+                              x.referencia === c.referencia ? { ...x, facturaSolicitada: new Date().toISOString() } : x
+                            ),
+                          }
+                      )
                     }
-                  )
-                }
-              />
-            ))}
-          </div>
-        </section>
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
       )}
 
-      <section>
-        <h2 className="mb-3 text-base font-semibold text-zinc-800">Documentos</h2>
-        {datos.documentos.length === 0 ? (
-          <p className="rounded-md border border-[var(--borde)] bg-zinc-50 p-4 text-sm text-zinc-600">
-            Aquí aparecerán los documentos que la organización comparta contigo.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {datos.documentos.map((d) => (
-              <li
-                key={d.id}
-                className="flex flex-col gap-2 rounded-md border border-[var(--borde)] p-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="text-sm">
-                  <p className="font-semibold text-zinc-800">{d.titulo}</p>
-                  {d.descripcion && <p className="whitespace-pre-line text-zinc-600">{d.descripcion}</p>}
-                </div>
-                <a
-                  href={`/api/portal/documento?id=${encodeURIComponent(d.id)}`}
-                  className="shrink-0 self-start rounded-md border border-[var(--borde)] px-3 py-1.5 text-sm font-medium text-[var(--balvert-azul-oscuro)] hover:bg-zinc-50 sm:self-auto"
+      {pestana === "documentos" && (
+        <div className="flex flex-col gap-4">
+          {!tieneDocumentos && (
+            <Aviso tipo="info">
+              Todavía no hay documentos para ti. Cuando la organización comparta alguno (por ejemplo, tu factura), aparecerá
+              aquí y te avisaremos por email.
+            </Aviso>
+          )}
+          {datos.documentos.length > 0 && (
+            <ul className="flex flex-col gap-2">
+              {datos.documentos.map((d) => (
+                <li
+                  key={d.id}
+                  className="flex flex-col gap-2 rounded-md border border-[var(--borde)] p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  Descargar
-                </a>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                  <div className="text-sm">
+                    <p className="font-semibold text-zinc-800">{d.titulo}</p>
+                    {d.descripcion && <p className="whitespace-pre-line text-zinc-600">{d.descripcion}</p>}
+                  </div>
+                  <a
+                    href={`/api/portal/documento?id=${encodeURIComponent(d.id)}`}
+                    className="inline-flex min-h-11 shrink-0 items-center self-start rounded-md border border-[var(--borde)] px-4 py-2 text-sm font-medium text-[var(--balvert-azul-oscuro)] hover:bg-zinc-50 sm:self-auto"
+                  >
+                    Descargar
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+          {empresas && <DocumentosOrganizacion empresas={empresas} />}
+        </div>
+      )}
+
+      <Contacto />
     </PortalMarco>
+  );
+}
+
+function Contacto() {
+  return (
+    <p className="mt-8 border-t border-[var(--borde)] pt-4 text-center text-sm text-zinc-600">
+      ¿Dudas? Escríbenos a{" "}
+      <a href="mailto:secretaria@balvert.es" className="font-medium text-[var(--balvert-azul-oscuro)] underline">
+        secretaria@balvert.es
+      </a>
+    </p>
   );
 }
