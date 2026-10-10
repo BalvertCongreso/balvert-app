@@ -254,7 +254,10 @@ function Subir({ e, onSubido }: { e: EmpresaMaterial; onSubido: () => void }) {
       });
       const { error: errorSubida } = await supabase.storage
         .from(BUCKET_ARCHIVOS_PATROCINADOR)
-        .uploadToSignedUrl(ruta, token, archivo, { contentType: tipoMime });
+        // Con un File, Supabase usa el tipo que le puso el navegador (a menudo
+        // vacío en AI/EPS/KEY) e ignora contentType: se reenvuelve con el
+        // tipo que ha decidido el servidor por la extensión.
+        .uploadToSignedUrl(ruta, token, new Blob([archivo], { type: tipoMime }));
       if (errorSubida) {
         throw new Error(
           /size|large|exceed/i.test(errorSubida.message) ? MENSAJE_DEMASIADO_GRANDE : "No se pudo subir el archivo. Inténtalo de nuevo."

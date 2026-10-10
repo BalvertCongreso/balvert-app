@@ -100,7 +100,10 @@ export default function ArchivosPatrocinador({
       });
       const { error: errorSubida } = await supabase.storage
         .from(BUCKET_ARCHIVOS_PATROCINADOR)
-        .uploadToSignedUrl(ruta, token, archivo, { contentType: tipoMime });
+        // Con un File, Supabase usa el tipo que le puso el navegador (a menudo
+        // vacío en AI/EPS/KEY) e ignora contentType: se reenvuelve con el
+        // tipo que ha decidido el servidor por la extensión.
+        .uploadToSignedUrl(ruta, token, new Blob([archivo], { type: tipoMime }));
       if (errorSubida) throw new Error("No se pudo subir el archivo: " + errorSubida.message);
       await llamarApiJson("/api/patrocinadores/archivos", {
         patrocinador_id: patrocinadorId,
