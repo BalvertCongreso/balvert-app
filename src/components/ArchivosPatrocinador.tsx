@@ -5,7 +5,9 @@ import { supabase } from "@/lib/supabaseClient";
 import { cabeceraAutorizacion, llamarApiGet, llamarApiJson } from "@/lib/apiCliente";
 import {
   BUCKET_ARCHIVOS_PATROCINADOR,
+  FORMATOS_PERMITIDOS,
   MAX_TITULO_ARCHIVO,
+  MENSAJE_DEMASIADO_GRANDE,
   NOMBRE_TIPO_ARCHIVO,
   TAMANO_MAXIMO_ARCHIVO,
   TIPOS_ARCHIVO,
@@ -14,8 +16,10 @@ import {
   type TipoArchivo,
 } from "@/lib/patrocinadorArchivos";
 
-// Archivos internos del patrocinador (logo, contrato firmado…). Privados:
-// solo el panel interno; nunca en el portal ni en las descargas Excel/CSV.
+// Archivos del patrocinador (logo, contrato firmado, ponencia…). Los que sube
+// el equipo solo los ve la empresa en su área si se marcan como visibles; los
+// que sube la empresa desde el portal llevan la etiqueta "Subido por la
+// empresa". Nunca salen en las descargas Excel/CSV.
 
 interface Archivo {
   id: string;
@@ -24,6 +28,10 @@ interface Archivo {
   nombre_archivo: string;
   autor: string | null;
   creado: string;
+  origen: "equipo" | "patrocinador";
+  email_subida: string | null;
+  comentario: string | null;
+  visible_empresa: boolean;
   // Solo PNG/JPG/WEBP. SVG, AI y EPS nunca se muestran: solo se descargan.
   miniatura: string | null;
 }
@@ -40,11 +48,19 @@ function formatearFecha(iso: string) {
   });
 }
 
-export default function ArchivosPatrocinador({ patrocinadorId }: { patrocinadorId: string }) {
+export default function ArchivosPatrocinador({
+  patrocinadorId,
+  onCambiosFicha,
+}: {
+  patrocinadorId: string;
+  // Al borrar el último logo/ponencia la ficha cambia ("Logo recibido" → No).
+  onCambiosFicha?: (cambios: Record<string, string>) => void;
+}) {
   const [archivos, setArchivos] = useState<Archivo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tipo, setTipo] = useState<TipoArchivo>("logo");
   const [titulo, setTitulo] = useState("");
+  const [visibleEmpresa, setVisibleEmpresa] = useState(false);
   const [archivo, setArchivo] = useState<File | null>(null);
   const [subiendo, setSubiendo] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -68,11 +84,11 @@ export default function ArchivosPatrocinador({ patrocinadorId }: { patrocinadorI
     if (!archivo) return;
     setError(null);
     if (!TIPO_POR_EXTENSION[extensionDe(archivo.name)]) {
-      setError("Solo se pueden subir PDF, PNG, JPG, WEBP, SVG, AI o EPS.");
+      setError(`Solo se pueden subir ${FORMATOS_PERMITIDOS}.`);
       return;
     }
     if (archivo.size > TAMANO_MAXIMO_ARCHIVO) {
-      setError("El archivo pesa demasiado (máximo 50 MB).");
+      setError(MENSAJE_DEMASIADO_GRANDE);
       return;
     }
     setSubiendo(true);
@@ -91,8 +107,10 @@ export default function ArchivosPatrocinador({ patrocinadorId }: { patrocinadorI
         ruta_archivo: ruta,
         tipo,
         titulo,
+        visible_empresa: visibleEmpresa,
       });
       setTitulo("");
+      setVisibleEmpresa(false);
       setArchivo(null);
       if (inputRef.current) inputRef.current.value = "";
       await cargar();
@@ -129,14 +147,33 @@ export default function ArchivosPatrocinador({ patrocinadorId }: { patrocinadorI
       return;
     }
     setArchivos((prev) => prev?.filter((x) => x.id !== a.id) ?? null);
+    const data = await res.json().catch(() => ({}));
+    if (data.cambiosFicha && Object.keys(data.cambiosFicha).length > 0) onCambiosFicha?.(data.cambiosFicha);
+  }
+
+  async function cambiarVisible(a: Archivo, visible: boolean) {
+    setError(null);
+    try {
+      const res = await fetch("/api/patrocinadores/archivos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...(await cabeceraAutorizacion()) },
+        body: JSON.stringify({ id: a.id, visible_empresa: visible }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "No se pudo guardar.");
+      setArchivos((prev) => prev?.map((x) => (x.id === a.id ? { ...x, visible_empresa: visible } : x)) ?? null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error inesperado.");
+    }
   }
 
   return (
     <section className="rounded-lg border border-[var(--borde)] bg-white p-4">
       <h3 className="seccion-titulo">Archivos</h3>
       <p className="mb-4 text-xs text-zinc-500">
-        Logo, contrato firmado y otros archivos. Solo los ves en este panel: no aparecen en el
-        área de clientes.
+        Logo, contrato firmado, ponencia y otros archivos. Lo que subas aquí solo lo ve la
+        empresa en su área de cliente si marcas &quot;Visible para la empresa&quot;. Lo que sube la
+        empresa desde su área aparece con la etiqueta &quot;Subido por la empresa&quot;.
       </p>
 
       <form onSubmit={subir} className="mb-5 grid gap-3 sm:grid-cols-[10rem_1fr]">
@@ -179,8 +216,12 @@ export default function ArchivosPatrocinador({ patrocinadorId }: { patrocinadorI
             onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
             className="text-sm"
           />
-          <p className="mt-1 text-xs text-zinc-500">PDF, PNG, JPG, WEBP, SVG, AI o EPS. Máximo 50 MB.</p>
+          <p className="mt-1 text-xs text-zinc-500">{FORMATOS_PERMITIDOS}. Máximo 50 MB.</p>
         </div>
+        <label className="flex items-center gap-2 text-sm sm:col-start-2">
+          <input type="checkbox" checked={visibleEmpresa} onChange={(e) => setVisibleEmpresa(e.target.checked)} />
+          Visible para la empresa en su área
+        </label>
         <div className="sm:col-start-2">
           <button
             type="submit"
@@ -223,8 +264,30 @@ export default function ArchivosPatrocinador({ patrocinadorId }: { patrocinadorI
                 <p className="truncate text-xs text-zinc-500">
                   {a.titulo ? `${a.nombre_archivo} · ` : ""}
                   {formatearFecha(a.creado)}
-                  {a.autor ? ` · ${a.autor}` : ""}
+                  {a.origen === "equipo" && a.autor ? ` · ${a.autor}` : ""}
                 </p>
+                {a.origen === "patrocinador" && (
+                  <p className="mt-1">
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                      Subido por la empresa — {a.email_subida ?? "portal"}
+                    </span>
+                  </p>
+                )}
+                {a.comentario && (
+                  <p className="mt-1 whitespace-pre-line text-xs text-zinc-700">
+                    <span className="font-medium">Comentario:</span> {a.comentario}
+                  </p>
+                )}
+                {a.origen === "equipo" && (
+                  <label className="mt-1 flex items-center gap-2 text-xs text-zinc-600">
+                    <input
+                      type="checkbox"
+                      checked={a.visible_empresa}
+                      onChange={(e) => cambiarVisible(a, e.target.checked)}
+                    />
+                    Visible para la empresa en su área
+                  </label>
+                )}
               </div>
               <div className="flex gap-3 text-sm">
                 <button

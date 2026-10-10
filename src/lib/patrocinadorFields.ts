@@ -90,6 +90,12 @@ export const seccionesPatrocinador: SeccionDef[] = [
         tipo: "select",
         opciones: ["Sí", "No"],
       },
+      {
+        key: "rollups_solicitados",
+        label: "Rollups solicitados",
+        tipo: "numero",
+        nota: "Cuántos rollups ha pedido que le fabriquemos (de 0 a 99). Lo puede cambiar la empresa desde su área.",
+      },
       { key: "necesidades_stand", label: "Necesidades del mostrador", tipo: "texto-largo" },
     ],
   },

@@ -4,6 +4,7 @@ import {
   BUCKET_ARCHIVOS_PATROCINADOR,
   EXTENSIONES_CON_MINIATURA,
   MAX_TITULO_ARCHIVO,
+  desmarcarCasillaSiNoQuedan,
   esTipoArchivo,
   extensionDe,
   nombreAutor,
@@ -11,10 +12,10 @@ import {
 
 export const runtime = "nodejs";
 
-// Archivos internos de la ficha de un patrocinador. La tabla
-// patrocinador_archivos y su bucket no tienen políticas: solo se tocan desde
-// aquí con la clave de servicio, tras comprobar el login interno. El portal
-// (que usa su propia cookie, no una sesión de Supabase) no puede entrar.
+// Archivos de la ficha de un patrocinador, desde el panel interno. La tabla
+// patrocinador_archivos y su bucket no tienen políticas: solo se tocan con la
+// clave de servicio, aquí (tras comprobar el login interno) y desde
+// /api/portal/materiales/* (con la sesión del portal, solo lo de su empresa).
 
 const sinSesion = () =>
   NextResponse.json({ error: "Sesión no encontrada. Vuelve a iniciar sesión." }, { status: 401 });
@@ -27,7 +28,7 @@ export async function GET(req: Request) {
   const supabase = crearClienteServicio();
   const { data, error } = await supabase
     .from("patrocinador_archivos")
-    .select("id, tipo, titulo, nombre_archivo, ruta_archivo, autor, creado")
+    .select("id, tipo, titulo, nombre_archivo, ruta_archivo, autor, creado, origen, email_subida, comentario, visible_empresa")
     .eq("patrocinador_id", patrocinadorId)
     .order("creado", { ascending: false });
   if (error) {
@@ -60,6 +61,7 @@ export async function POST(req: Request) {
   const ruta = typeof body?.ruta_archivo === "string" ? body.ruta_archivo : "";
   const tipo = body?.tipo;
   const titulo = typeof body?.titulo === "string" ? body.titulo.trim() : "";
+  const visibleEmpresa = body?.visible_empresa === true;
 
   if (!esTipoArchivo(tipo)) {
     return NextResponse.json({ error: "Elige el tipo de archivo." }, { status: 400 });
@@ -88,6 +90,8 @@ export async function POST(req: Request) {
     ruta_archivo: ruta,
     nombre_archivo: partes[2],
     autor: nombreAutor(usuario.email),
+    origen: "equipo",
+    visible_empresa: visibleEmpresa,
   });
   if (error) {
     await bucket.remove([ruta]);
@@ -96,15 +100,39 @@ export async function POST(req: Request) {
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(req: Request) {
+// "Visible para la empresa en su área": solo en los archivos del equipo (lo
+// que sube la empresa ya lo ve ella siempre).
+export async function PATCH(req: Request) {
   if (!(await usuarioDesdeCabecera(req.headers.get("authorization")))) return sinSesion();
+  const body = await req.json().catch(() => null);
+  const id = typeof body?.id === "string" ? body.id : "";
+  if (!id || typeof body?.visible_empresa !== "boolean") {
+    return NextResponse.json({ error: "Datos no válidos." }, { status: 400 });
+  }
+  const supabase = crearClienteServicio();
+  const { data, error } = await supabase
+    .from("patrocinador_archivos")
+    .update({ visible_empresa: body.visible_empresa })
+    .eq("id", id)
+    .eq("origen", "equipo")
+    .select("id");
+  if (error) {
+    return NextResponse.json({ error: "No se pudo guardar: " + error.message }, { status: 500 });
+  }
+  if (!data || data.length === 0) return NextResponse.json({ error: "Archivo no encontrado." }, { status: 404 });
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(req: Request) {
+  const usuario = await usuarioDesdeCabecera(req.headers.get("authorization"));
+  if (!usuario) return sinSesion();
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Falta el id." }, { status: 400 });
 
   const supabase = crearClienteServicio();
   const { data: archivo } = await supabase
     .from("patrocinador_archivos")
-    .select("ruta_archivo")
+    .select("ruta_archivo, patrocinador_id, tipo")
     .eq("id", id)
     .maybeSingle();
   if (!archivo) return NextResponse.json({ error: "Archivo no encontrado." }, { status: 404 });
@@ -114,5 +142,18 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "No se pudo borrar: " + error.message }, { status: 500 });
   }
   await supabase.storage.from(BUCKET_ARCHIVOS_PATROCINADOR).remove([archivo.ruta_archivo]);
-  return NextResponse.json({ ok: true });
+
+  // Si era el último logo/ponencia, "Logo recibido"/"Ponencia recibida" vuelve a No.
+  let cambiosFicha: Record<string, string> = {};
+  try {
+    cambiosFicha = await desmarcarCasillaSiNoQuedan(
+      supabase,
+      archivo.patrocinador_id,
+      archivo.tipo,
+      nombreAutor(usuario.email) ?? "Equipo"
+    );
+  } catch (e) {
+    console.error("archivos: no se pudo actualizar la casilla", e instanceof Error ? e.message : e);
+  }
+  return NextResponse.json({ ok: true, cambiosFicha });
 }

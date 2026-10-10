@@ -4,7 +4,15 @@ import { useState } from "react";
 import { seccionesEdicion } from "@/lib/edicionFields";
 import type { EdicionInput } from "@/types/database";
 
-const camposNumericos = new Set(["anio", "precio_congreso", "precio_gala", "precio_excursion", "precio_congreso_colegiado"]);
+const camposNumericos = new Set([
+  "anio",
+  "precio_congreso",
+  "precio_gala",
+  "precio_excursion",
+  "precio_congreso_colegiado",
+  "precio_rollup",
+  "precio_vinilado",
+]);
 const camposBooleanos = new Set(["activa"]);
 
 function valorParaInput(valor: string | number | boolean | null | undefined, esFechaHora: boolean): string {
@@ -81,7 +89,10 @@ export default function EdicionForm({
           <h3 className="seccion-titulo">{seccion.titulo}</h3>
           <div className="grid gap-4 sm:grid-cols-2">
             {seccion.campos.map((campo) => (
-              <div key={campo.key} className={campo.tipo === "booleano" ? "sm:col-span-2" : ""}>
+              <div
+                key={campo.key}
+                className={campo.tipo === "booleano" || campo.tipo === "texto-largo" ? "sm:col-span-2" : ""}
+              >
                 {campo.tipo === "booleano" ? (
                   <label className="flex items-center gap-2 text-sm font-medium">
                     <input
@@ -91,6 +102,19 @@ export default function EdicionForm({
                     />
                     {campo.label}
                   </label>
+                ) : campo.tipo === "texto-largo" ? (
+                  <>
+                    <label className="campo-label" htmlFor={campo.key}>
+                      {campo.label}
+                    </label>
+                    <textarea
+                      id={campo.key}
+                      className="campo-input"
+                      rows={8}
+                      value={valores[campo.key]}
+                      onChange={(e) => actualizar(campo.key, e.target.value)}
+                    />
+                  </>
                 ) : (
                   <>
                     <label className="campo-label" htmlFor={campo.key}>

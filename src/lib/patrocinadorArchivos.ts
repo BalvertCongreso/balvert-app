@@ -1,6 +1,9 @@
-// Archivos internos de cada patrocinador (logo, contrato…). Ver
-// 024_patrocinador_archivos.sql. Compartido entre la ficha del patrocinador
-// y las rutas /api/patrocinadores/*. Nunca se usa desde el portal.
+// Archivos de cada patrocinador (logo, contrato, ponencia…). Ver
+// 024_patrocinador_archivos.sql y 025_materiales_patrocinadores_portal.sql.
+// Compartido entre la ficha del patrocinador (/api/patrocinadores/*) y el
+// área de la empresa en el portal (/api/portal/materiales/*). Desde el
+// portal, la empresa solo ve lo que ella subió (origen "patrocinador") y lo
+// que el equipo marcó como visible (visible_empresa).
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const BUCKET_ARCHIVOS_PATROCINADOR = "patrocinadores-archivos";
@@ -19,21 +22,86 @@ export const TIPO_POR_EXTENSION: Record<string, string> = {
   svg: "image/svg+xml",
   ai: "application/postscript",
   eps: "application/postscript",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ppt: "application/vnd.ms-powerpoint",
+  key: "application/vnd.apple.keynote",
 };
+
+export const FORMATOS_PERMITIDOS = "PDF, PNG, JPG, WEBP, SVG, AI, EPS, PPTX, PPT o KEY";
+export const MENSAJE_DEMASIADO_GRANDE =
+  "Archivo demasiado grande (máximo 50 MB): envíalo por WeTransfer a secretaria@balvert.es.";
 
 // Solo estos se enseñan como miniatura. SVG, AI y EPS nunca se muestran en la
 // página (un SVG puede llevar código): solo se descargan.
 export const EXTENSIONES_CON_MINIATURA = new Set(["png", "jpg", "jpeg", "webp"]);
 
-export const TIPOS_ARCHIVO = ["logo", "contrato", "otro"] as const;
+export const TIPOS_ARCHIVO = ["logo", "ponencia", "rollup", "vinilado", "contrato", "otro"] as const;
 export type TipoArchivo = (typeof TIPOS_ARCHIVO)[number];
 export const NOMBRE_TIPO_ARCHIVO: Record<TipoArchivo, string> = {
   logo: "Logo",
+  ponencia: "Ponencia",
+  rollup: "Rollup",
+  vinilado: "Vinilado",
   contrato: "Contrato",
   otro: "Otro",
 };
 export function esTipoArchivo(valor: unknown): valor is TipoArchivo {
   return typeof valor === "string" && (TIPOS_ARCHIVO as readonly string[]).includes(valor);
+}
+
+// Lo que puede subir una empresa desde su área.
+export const TIPOS_ARCHIVO_PORTAL = ["logo", "ponencia", "rollup", "vinilado"] as const;
+export type TipoArchivoPortal = (typeof TIPOS_ARCHIVO_PORTAL)[number];
+export function esTipoArchivoPortal(valor: unknown): valor is TipoArchivoPortal {
+  return typeof valor === "string" && (TIPOS_ARCHIVO_PORTAL as readonly string[]).includes(valor);
+}
+
+export const MAX_COMENTARIO_ARCHIVO = 1000;
+
+// Casilla de la ficha que marca cada tipo de archivo. Rollup y vinilado no
+// marcan nada: esas casillas las cambia el pedido de producción del portal
+// (o el equipo en la ficha), no subir un archivo.
+export const CASILLA_POR_TIPO: Partial<Record<TipoArchivo, "logo_recibido" | "ponencia_recibida">> = {
+  logo: "logo_recibido",
+  ponencia: "ponencia_recibida",
+};
+
+// Cambia campos de la ficha dejando el autor en el historial (ver la función
+// actualizar_patrocinador_como de la migración 025, que solo deja tocar los
+// campos del portal y las casillas de logo/ponencia).
+export async function actualizarFichaComo(
+  supabase: SupabaseClient,
+  patrocinadorId: string,
+  autor: string,
+  campos: Record<string, string | number | null>
+) {
+  const { error } = await supabase.rpc("actualizar_patrocinador_como", {
+    p_id: patrocinadorId,
+    p_autor: autor,
+    p_campos: campos,
+  });
+  if (error) throw new Error(error.message);
+}
+
+// Tras borrar un archivo: si era el último logo (o la última ponencia) de la
+// empresa, su casilla vuelve a "No". Si queda otro, no se toca. Devuelve los
+// campos cambiados (para refrescar la ficha abierta).
+export async function desmarcarCasillaSiNoQuedan(
+  supabase: SupabaseClient,
+  patrocinadorId: string,
+  tipo: TipoArchivo,
+  autor: string
+): Promise<Record<string, string>> {
+  const casilla = CASILLA_POR_TIPO[tipo];
+  if (!casilla) return {};
+  const { count, error } = await supabase
+    .from("patrocinador_archivos")
+    .select("id", { count: "exact", head: true })
+    .eq("patrocinador_id", patrocinadorId)
+    .eq("tipo", tipo);
+  if (error || (count ?? 0) > 0) return {};
+  await actualizarFichaComo(supabase, patrocinadorId, autor, { [casilla]: "No" });
+  return { [casilla]: "No" };
 }
 
 export const MAX_TITULO_ARCHIVO = 150;

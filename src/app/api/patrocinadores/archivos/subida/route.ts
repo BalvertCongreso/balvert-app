@@ -3,6 +3,8 @@ import { randomUUID } from "crypto";
 import { crearClienteServicio, usuarioDesdeCabecera } from "@/lib/supabaseServidor";
 import {
   BUCKET_ARCHIVOS_PATROCINADOR,
+  FORMATOS_PERMITIDOS,
+  MENSAJE_DEMASIADO_GRANDE,
   TAMANO_MAXIMO_ARCHIVO,
   TIPO_POR_EXTENSION,
   extensionDe,
@@ -29,12 +31,13 @@ export async function POST(req: Request) {
   const tipo = TIPO_POR_EXTENSION[extensionDe(nombre)];
   if (!tipo) {
     return NextResponse.json(
-      { error: "Solo se pueden subir PDF, imágenes (PNG, JPG, WEBP, SVG) o archivos de diseño (AI, EPS)." },
+      { error: `Solo se pueden subir ${FORMATOS_PERMITIDOS}.` },
       { status: 400 }
     );
   }
-  if (tamano <= 0 || tamano > TAMANO_MAXIMO_ARCHIVO) {
-    return NextResponse.json({ error: "El archivo pesa demasiado (máximo 50 MB)." }, { status: 400 });
+  if (tamano <= 0) return NextResponse.json({ error: "El archivo está vacío." }, { status: 400 });
+  if (tamano > TAMANO_MAXIMO_ARCHIVO) {
+    return NextResponse.json({ error: MENSAJE_DEMASIADO_GRANDE }, { status: 400 });
   }
 
   const supabase = crearClienteServicio();

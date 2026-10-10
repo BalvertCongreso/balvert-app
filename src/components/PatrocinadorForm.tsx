@@ -13,6 +13,7 @@ const camposNumericos = new Set([
   "ponencia_duracion_min",
   "precio_tarifa",
   "precio_real_pagado",
+  "rollups_solicitados",
 ]);
 
 function valoresIniciales(): Record<string, string> {
@@ -32,6 +33,10 @@ interface Props {
   textoBoton: string;
   // Si se indica, avisa cuando el email ya aparece en otras ediciones.
   historialEmail?: { tabla: TablaHistorial; edicionId: string | null; registroId: string | null };
+  // Campos que ha cambiado otra parte de la página con la ficha abierta (p. ej.
+  // borrar el último logo pone "Logo recibido" en No): se copian al formulario
+  // para que "Guardar cambios" no los vuelva a dejar como estaban.
+  cambiosExternos?: Record<string, string>;
 }
 
 export default function PatrocinadorForm({
@@ -40,6 +45,7 @@ export default function PatrocinadorForm({
   onGuardar,
   textoBoton,
   historialEmail,
+  cambiosExternos,
 }: Props) {
   const [valores, setValores] = useState<Record<string, string>>(() => {
     const base = valoresIniciales();
@@ -51,6 +57,12 @@ export default function PatrocinadorForm({
     }
     return base;
   });
+
+  const [cambiosAplicados, setCambiosAplicados] = useState(cambiosExternos);
+  if (cambiosExternos !== cambiosAplicados) {
+    setCambiosAplicados(cambiosExternos);
+    if (cambiosExternos) setValores((prev) => ({ ...prev, ...cambiosExternos }));
+  }
 
   function actualizar(key: string, value: string) {
     setValores((prev) => ({ ...prev, [key]: value }));

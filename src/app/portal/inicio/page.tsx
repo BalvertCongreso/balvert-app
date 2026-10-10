@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import PortalMarco from "@/components/PortalMarco";
+import MaterialPatrocinador from "./MaterialPatrocinador";
 import { CAMPOS_FACTURACION, type DatosFacturacion } from "@/lib/factura";
 
 type Tabla = "congreso" | "gala" | "excursion";
@@ -283,19 +284,8 @@ export default function PortalInicioPage() {
     >
       <p className="mb-6 text-sm text-zinc-500">Has entrado como {datos.email}</p>
 
-      {esPatrocinador && (
-        <section className="mb-8">
-          <h2 className="mb-3 text-base font-semibold text-zinc-800">Tu empresa</h2>
-          <div className="flex flex-col gap-2">
-            {datos.empresas.map((e, i) => (
-              <div key={i} className="rounded-md border border-[var(--borde)] bg-zinc-50 p-4">
-                <p className="font-semibold text-zinc-800">{e.empresa ?? "Empresa patrocinadora"}</p>
-                {e.categoria && <p className="text-sm text-zinc-600">Patrocinio: {e.categoria}</p>}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* Por cada empresa: qué incluye, producción de rollup/vinilado, material y ponente. */}
+      {esPatrocinador && <MaterialPatrocinador />}
 
       {(esAsistente || !esPatrocinador) && (
         <section className="mb-8">

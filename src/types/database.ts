@@ -32,6 +32,14 @@ export interface Edicion {
   precio_gala: number | null;
   precio_excursion: number | null;
   precio_congreso_colegiado: number | null;
+
+  // Material para patrocinadores (portal)
+  precio_rollup: number | null;
+  precio_vinilado: number | null;
+  texto_material_patrocinadores: string | null;
+  incluye_diamante: string | null;
+  incluye_oro: string | null;
+  incluye_plata: string | null;
 }
 
 export type EdicionInput = Omit<Edicion, "id">;
@@ -73,6 +81,7 @@ export interface Patrocinador {
   tiene_stand: SiNoNA | null;
   vinilado_por_nuestra_cuenta: SiNo | null;
   rollup_por_nuestra_cuenta: SiNo | null;
+  rollups_solicitados: number | null;
   necesidades_stand: string | null;
 
   // Logo y materiales

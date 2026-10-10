@@ -67,4 +67,40 @@ export const seccionesEdicion: SeccionDef[] = [
       },
     ],
   },
+  {
+    titulo: "Material para patrocinadores",
+    campos: [
+      {
+        key: "precio_rollup",
+        label: "Precio rollup (€ + IVA, cada uno)",
+        tipo: "numero",
+        nota: "Producción de rollup de 150 × 200 cm que puede pedir cualquier patrocinador desde su área. Vacío o 0 = no se ofrece.",
+      },
+      {
+        key: "precio_vinilado",
+        label: "Precio vinilado del mostrador (€ + IVA)",
+        tipo: "numero",
+        nota: "Precio cerrado por el mostrador completo. Solo lo ven los patrocinadores con mostrador. Vacío o 0 = no se ofrece.",
+      },
+      {
+        key: "texto_material_patrocinadores",
+        label: "Medidas y condiciones (rollup y vinilado)",
+        tipo: "texto-largo",
+        nota: "Se muestra en el área de cada patrocinador, junto a los precios.",
+      },
+      {
+        key: "incluye_diamante",
+        label: "Qué incluye — Diamante",
+        tipo: "texto-largo",
+        nota: "Se muestra a los patrocinadores Diamante en su área (\"Qué incluye tu patrocinio\"). Una línea por beneficio.",
+      },
+      { key: "incluye_oro", label: "Qué incluye — Oro", tipo: "texto-largo" },
+      {
+        key: "incluye_plata",
+        label: "Qué incluye — Plata",
+        tipo: "texto-largo",
+        nota: "Institucional y Personalizado ven lo que haya en \"Beneficios incluidos\" de su ficha.",
+      },
+    ],
+  },
 ];

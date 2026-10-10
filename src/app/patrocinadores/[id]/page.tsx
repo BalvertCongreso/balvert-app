@@ -19,6 +19,7 @@ export default function EditarPatrocinadorPage() {
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cambiosFicha, setCambiosFicha] = useState<Record<string, string> | undefined>(undefined);
 
   useEffect(() => {
     async function cargar() {
@@ -107,8 +108,12 @@ export default function EditarPatrocinadorPage() {
             guardando={guardando}
             onGuardar={guardar}
             textoBoton="Guardar cambios"
+            cambiosExternos={cambiosFicha}
           />
-          <ArchivosPatrocinador patrocinadorId={patrocinador.id} />
+          <ArchivosPatrocinador
+            patrocinadorId={patrocinador.id}
+            onCambiosFicha={(cambios) => setCambiosFicha({ ...cambios })}
+          />
           <HistorialCambios
             tabla="patrocinadores"
             registroId={patrocinador.id}
