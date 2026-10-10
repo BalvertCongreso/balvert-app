@@ -23,6 +23,7 @@ interface Documento {
   nombre_archivo: string;
   destino: Destino;
   patrocinador_id: string | null;
+  email_destinatario: string | null;
   creado: string;
   patrocinadores: { empresa_entidad: string | null } | null;
 }
@@ -38,6 +39,7 @@ interface Formulario {
   descripcion: string;
   destino: Destino;
   patrocinadorId: string;
+  emailDestinatario: string;
   archivo: File | null;
 }
 
@@ -47,6 +49,7 @@ const formularioVacio = (): Formulario => ({
   descripcion: "",
   destino: "todos_asistentes",
   patrocinadorId: "",
+  emailDestinatario: "",
   archivo: null,
 });
 
@@ -127,6 +130,10 @@ export default function DocumentosPage() {
       setErrorForm("Elige la empresa patrocinadora.");
       return;
     }
+    if (form.destino === "asistente" && !form.emailDestinatario.trim()) {
+      setErrorForm("Escribe el email de la persona.");
+      return;
+    }
 
     setGuardando(true);
     try {
@@ -137,6 +144,7 @@ export default function DocumentosPage() {
         descripcion: form.descripcion,
         destino: form.destino,
         patrocinador_id: form.destino === "patrocinador" ? form.patrocinadorId : null,
+        email_destinatario: form.destino === "asistente" ? form.emailDestinatario : null,
         ruta_archivo: ruta,
       });
       setForm(null);
@@ -183,6 +191,7 @@ export default function DocumentosPage() {
       descripcion: doc.descripcion ?? "",
       destino: doc.destino,
       patrocinadorId: doc.patrocinador_id ?? "",
+      emailDestinatario: doc.email_destinatario ?? "",
       archivo: null,
     });
   }
@@ -190,6 +199,8 @@ export default function DocumentosPage() {
   const aQuien = (d: Documento) =>
     d.destino === "patrocinador"
       ? `Empresa: ${d.patrocinadores?.empresa_entidad ?? "(empresa borrada)"}`
+      : d.destino === "asistente"
+      ? `Persona: ${d.email_destinatario}`
       : NOMBRE_DESTINO[d.destino];
 
   return (
@@ -304,6 +315,22 @@ export default function DocumentosPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+            )}
+            {form.destino === "asistente" && (
+              <div>
+                <label className="campo-label" htmlFor="doc-email">
+                  Email de la persona *
+                </label>
+                <input
+                  id="doc-email"
+                  type="email"
+                  maxLength={254}
+                  className="campo-input"
+                  placeholder="El mismo con el que compró o pidió la factura"
+                  value={form.emailDestinatario}
+                  onChange={(e) => setForm({ ...form, emailDestinatario: e.target.value })}
+                />
               </div>
             )}
           </div>

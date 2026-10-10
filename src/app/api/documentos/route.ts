@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { crearClienteServicio, usuarioDesdeCabecera } from "@/lib/supabaseServidor";
-import { idEdicionActiva } from "@/lib/portal";
+import { EMAIL_REGEX, empresasDelEmail, idEdicionActiva, normalizarEmail, tieneEntradas } from "@/lib/portal";
 import { BUCKET_DOCUMENTOS, MAX_DESCRIPCION, MAX_TITULO, esDestino } from "@/lib/documentos";
 
 export const runtime = "nodejs";
@@ -23,7 +23,7 @@ export async function GET(req: Request) {
 
   const { data, error } = await supabase
     .from("documentos")
-    .select("id, titulo, descripcion, nombre_archivo, destino, patrocinador_id, creado, patrocinadores(empresa_entidad)")
+    .select("id, titulo, descripcion, nombre_archivo, destino, patrocinador_id, email_destinatario, creado, patrocinadores(empresa_entidad)")
     .eq("edicion_id", edicionId)
     .order("creado", { ascending: false });
   if (error) {
@@ -47,6 +47,7 @@ export async function POST(req: Request) {
   const destino = body.destino;
   const patrocinadorId = typeof body.patrocinador_id === "string" && body.patrocinador_id ? body.patrocinador_id : null;
   const ruta = typeof body.ruta_archivo === "string" ? body.ruta_archivo : null;
+  const emailDestinatario = normalizarEmail(body.email_destinatario);
 
   if (!titulo || titulo.length > MAX_TITULO) {
     return NextResponse.json({ error: `Escribe un título (máximo ${MAX_TITULO} caracteres).` }, { status: 400 });
@@ -59,6 +60,9 @@ export async function POST(req: Request) {
   }
   if (destino === "patrocinador" && !patrocinadorId) {
     return NextResponse.json({ error: "Elige la empresa patrocinadora." }, { status: 400 });
+  }
+  if (destino === "asistente" && !EMAIL_REGEX.test(emailDestinatario)) {
+    return NextResponse.json({ error: "Escribe el email de la persona." }, { status: 400 });
   }
 
   const supabase = crearClienteServicio();
@@ -79,6 +83,21 @@ export async function POST(req: Request) {
     }
   }
 
+  // Para evitar erratas: el email tiene que poder entrar en el portal (tener
+  // entradas o ser contacto de un patrocinador en la edición activa).
+  if (destino === "asistente") {
+    const [conEntradas, empresas] = await Promise.all([
+      tieneEntradas(supabase, edicionId, emailDestinatario),
+      empresasDelEmail(supabase, edicionId, emailDestinatario),
+    ]);
+    if (!conEntradas && empresas.length === 0) {
+      return NextResponse.json(
+        { error: "Ese email no tiene entradas ni es contacto de un patrocinador en esta edición: no podría entrar al área de clientes para verlo. Revisa que esté bien escrito." },
+        { status: 400 }
+      );
+    }
+  }
+
   // La ruta solo puede ser una que haya preparado /api/documentos/subida
   // (carpeta de la edición activa) y el archivo tiene que estar subido.
   if (ruta) {
@@ -96,6 +115,7 @@ export async function POST(req: Request) {
     descripcion: descripcion || null,
     destino,
     patrocinador_id: destino === "patrocinador" ? patrocinadorId : null,
+    email_destinatario: destino === "asistente" ? emailDestinatario : null,
     ...(ruta && { ruta_archivo: ruta, nombre_archivo: ruta.split("/").pop()! }),
   };
 

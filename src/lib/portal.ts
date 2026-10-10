@@ -168,7 +168,8 @@ export interface DocumentoPortal {
 
 // Documentos de la edición activa que le corresponden a este email:
 // "todos_asistentes" si tiene alguna entrada, "todos_patrocinadores" si es
-// contacto de alguna empresa, y los de "patrocinador" de SUS empresas.
+// contacto de alguna empresa, los de "patrocinador" de SUS empresas y los de
+// "asistente" dirigidos a su email.
 export async function documentosVisibles(
   supabase: SupabaseClient,
   edicionId: string,
@@ -178,14 +179,17 @@ export async function documentosVisibles(
     tieneEntradas(supabase, edicionId, email),
     empresasDelEmail(supabase, edicionId, email),
   ]);
-  const filtros: string[] = [];
+  // Los documentos para una persona concreta (p. ej. su factura), por su
+  // email. Va entre comillas dobles para que ningún carácter del email
+  // cambie el sentido del filtro.
+  const emailFiltro = `"${email.replace(/["\\]/g, (c) => `\\${c}`)}"`;
+  const filtros: string[] = [`and(destino.eq.asistente,email_destinatario.eq.${emailFiltro})`];
   if (conEntradas) filtros.push("destino.eq.todos_asistentes");
   if (empresas.length > 0) {
     filtros.push("destino.eq.todos_patrocinadores");
     // Ids que vienen de la base de datos (uuid), no del navegador.
     filtros.push(`and(destino.eq.patrocinador,patrocinador_id.in.(${empresas.map((e) => e.id).join(",")}))`);
   }
-  if (filtros.length === 0) return [];
 
   const { data, error } = await supabase
     .from("documentos")

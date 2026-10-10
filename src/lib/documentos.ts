@@ -14,13 +14,14 @@ export const TIPOS_DOCUMENTO_PERMITIDOS: Record<string, string> = {
   "image/webp": "webp",
 };
 
-export const DESTINOS = ["todos_asistentes", "todos_patrocinadores", "patrocinador"] as const;
+export const DESTINOS = ["todos_asistentes", "todos_patrocinadores", "patrocinador", "asistente"] as const;
 export type Destino = (typeof DESTINOS)[number];
 
 export const NOMBRE_DESTINO: Record<Destino, string> = {
   todos_asistentes: "Todos los asistentes",
   todos_patrocinadores: "Todos los patrocinadores",
   patrocinador: "Una empresa patrocinadora",
+  asistente: "Una persona (por su email)",
 };
 
 export function esDestino(valor: unknown): valor is Destino {
