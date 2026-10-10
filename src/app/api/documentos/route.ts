@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { crearClienteServicio, usuarioDesdeCabecera } from "@/lib/supabaseServidor";
-import { EMAIL_REGEX, empresasDelEmail, idEdicionActiva, normalizarEmail, tieneEntradas } from "@/lib/portal";
+import { EMAIL_REGEX, empresasDelEmail, idEdicionActiva, normalizarEmail, origenDeConfianza, tieneEntradas } from "@/lib/portal";
+import { enviarAvisoDocumento } from "@/lib/avisoDocumento";
 import { BUCKET_DOCUMENTOS, MAX_DESCRIPCION, MAX_TITULO, esDestino } from "@/lib/documentos";
 
 export const runtime = "nodejs";
@@ -48,6 +49,9 @@ export async function POST(req: Request) {
   const patrocinadorId = typeof body.patrocinador_id === "string" && body.patrocinador_id ? body.patrocinador_id : null;
   const ruta = typeof body.ruta_archivo === "string" ? body.ruta_archivo : null;
   const emailDestinatario = normalizarEmail(body.email_destinatario);
+  // Solo para destino "Una persona": avisarle por email al subir el archivo
+  // (al crearlo o al reemplazar el archivo, no al cambiar solo el título).
+  const avisar = body.avisar === true;
 
   if (!titulo || titulo.length > MAX_TITULO) {
     return NextResponse.json({ error: `Escribe un título (máximo ${MAX_TITULO} caracteres).` }, { status: 400 });
@@ -128,7 +132,7 @@ export async function POST(req: Request) {
       await supabase.storage.from(BUCKET_DOCUMENTOS).remove([ruta]);
       return NextResponse.json({ error: "No se pudo guardar el documento: " + error.message }, { status: 500 });
     }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, ...(await avisarSiCorresponde()) });
   }
 
   const { data: anterior } = await supabase.from("documentos").select("ruta_archivo").eq("id", id).maybeSingle();
@@ -142,7 +146,16 @@ export async function POST(req: Request) {
   if (ruta && ruta !== anterior.ruta_archivo) {
     await supabase.storage.from(BUCKET_DOCUMENTOS).remove([anterior.ruta_archivo]);
   }
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, ...(await avisarSiCorresponde()) });
+
+  // El documento ya está guardado pase lo que pase con el email: si el aviso
+  // falla, se dice en la respuesta para que la pantalla lo muestre.
+  async function avisarSiCorresponde(): Promise<{ aviso?: "enviado" | string }> {
+    if (destino !== "asistente" || !avisar || !ruta) return {};
+    const fallo = await enviarAvisoDocumento(emailDestinatario, titulo, origenDeConfianza(req));
+    if (fallo) console.error("documentos: el aviso por email falló", fallo);
+    return { aviso: fallo ? `El documento se guardó, pero el email de aviso falló: ${fallo}` : "enviado" };
+  }
 }
 
 export async function DELETE(req: Request) {

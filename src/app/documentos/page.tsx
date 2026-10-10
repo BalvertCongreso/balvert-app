@@ -40,6 +40,7 @@ interface Formulario {
   destino: Destino;
   patrocinadorId: string;
   emailDestinatario: string;
+  avisar: boolean;
   archivo: File | null;
 }
 
@@ -50,6 +51,7 @@ const formularioVacio = (): Formulario => ({
   destino: "todos_asistentes",
   patrocinadorId: "",
   emailDestinatario: "",
+  avisar: true,
   archivo: null,
 });
 
@@ -78,6 +80,7 @@ export default function DocumentosPage() {
   const [form, setForm] = useState<Formulario | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [errorForm, setErrorForm] = useState<string | null>(null);
+  const [mensaje, setMensaje] = useState<string | null>(null);
 
   async function cargar() {
     setCargando(true);
@@ -138,16 +141,22 @@ export default function DocumentosPage() {
     setGuardando(true);
     try {
       const ruta = form.archivo ? await subirDocumento(form.archivo) : null;
-      await llamarApiJson("/api/documentos", {
+      const respuesta = await llamarApiJson("/api/documentos", {
         id: form.id,
         titulo: form.titulo,
         descripcion: form.descripcion,
         destino: form.destino,
         patrocinador_id: form.destino === "patrocinador" ? form.patrocinadorId : null,
         email_destinatario: form.destino === "asistente" ? form.emailDestinatario : null,
+        avisar: form.destino === "asistente" && form.avisar,
         ruta_archivo: ruta,
       });
       setForm(null);
+      setMensaje(
+        respuesta.aviso === "enviado"
+          ? `Guardado. Hemos avisado por email a ${form.emailDestinatario.trim()}.`
+          : respuesta.aviso ?? "Guardado."
+      );
       await cargar();
     } catch (e) {
       setErrorForm(e instanceof Error ? e.message : "Error inesperado.");
@@ -192,6 +201,7 @@ export default function DocumentosPage() {
       destino: doc.destino,
       patrocinadorId: doc.patrocinador_id ?? "",
       emailDestinatario: doc.email_destinatario ?? "",
+      avisar: true,
       archivo: null,
     });
   }
@@ -222,6 +232,7 @@ export default function DocumentosPage() {
             type="button"
             onClick={() => {
               setErrorForm(null);
+              setMensaje(null);
               setForm(formularioVacio());
             }}
             className="rounded-md px-4 py-2 text-sm font-semibold text-white"
@@ -331,6 +342,14 @@ export default function DocumentosPage() {
                   value={form.emailDestinatario}
                   onChange={(e) => setForm({ ...form, emailDestinatario: e.target.value })}
                 />
+                <label className="mt-2 flex items-center gap-2 text-sm text-zinc-700">
+                  <input
+                    type="checkbox"
+                    checked={form.avisar}
+                    onChange={(e) => setForm({ ...form, avisar: e.target.checked })}
+                  />
+                  {form.id ? "Avisarle por email si reemplazo el archivo" : "Avisarle por email de que ya lo tiene"}
+                </label>
               </div>
             )}
           </div>
@@ -355,6 +374,15 @@ export default function DocumentosPage() {
             </button>
           </div>
         </form>
+      )}
+
+      {mensaje && (
+        <div className="flex items-start justify-between gap-3 rounded-md border border-[var(--borde)] bg-white p-3 text-sm text-zinc-700">
+          <span>{mensaje}</span>
+          <button type="button" onClick={() => setMensaje(null)} className="text-zinc-400 hover:text-zinc-600" aria-label="Cerrar">
+            ×
+          </button>
+        </div>
       )}
 
       {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}

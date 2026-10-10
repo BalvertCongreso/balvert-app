@@ -95,7 +95,7 @@ export async function POST(req: Request) {
     "ENTRADAS",
     ...lineas,
     "",
-    `CUANDO LA TENGAS: súbela en Documentos → "Una persona (por su email)" → ${sesion.email}. La verá en su área de cliente.`,
+    `CUANDO LA TENGAS: súbela en Documentos → "Una persona (por su email)" → ${sesion.email}. Deja marcado "Avisarle por email": le llegará un aviso y la verá en su área de cliente.`,
   ].join("\n");
 
   const { data: tarea, error: errorTarea } = await supabase
