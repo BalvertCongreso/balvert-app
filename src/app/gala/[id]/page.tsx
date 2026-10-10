@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import HistorialCambios from "@/components/HistorialCambios";
 import { supabase } from "@/lib/supabaseClient";
 import { seccionesGala } from "@/lib/galaFields";
 import InscripcionForm from "@/components/InscripcionForm";
@@ -108,6 +109,7 @@ export default function EditarAsistenteGalaPage() {
             onGuardar={guardar}
             textoBoton="Guardar cambios"
           />
+          <HistorialCambios tabla="gala" registroId={asistente.id} secciones={seccionesGala} />
         </>
       )}
     </div>

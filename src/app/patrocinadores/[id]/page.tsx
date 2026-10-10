@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import HistorialCambios from "@/components/HistorialCambios";
+import { seccionesPatrocinador } from "@/lib/patrocinadorFields";
 import { supabase } from "@/lib/supabaseClient";
 import PatrocinadorForm from "@/components/PatrocinadorForm";
 import CrearInvitaciones from "@/components/CrearInvitaciones";
@@ -103,6 +105,11 @@ export default function EditarPatrocinadorPage() {
             guardando={guardando}
             onGuardar={guardar}
             textoBoton="Guardar cambios"
+          />
+          <HistorialCambios
+            tabla="patrocinadores"
+            registroId={patrocinador.id}
+            secciones={seccionesPatrocinador}
           />
         </>
       )}

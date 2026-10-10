@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import HistorialCambios from "@/components/HistorialCambios";
+import { seccionesProveedor } from "@/lib/proveedorFields";
 import { supabase } from "@/lib/supabaseClient";
 import ProveedorForm from "@/components/ProveedorForm";
 import type { Proveedor, ProveedorInput } from "@/types/database";
@@ -89,12 +91,15 @@ export default function EditarProveedorPage() {
       {cargando && <p className="text-sm text-zinc-500">Cargando…</p>}
 
       {!cargando && proveedor && (
-        <ProveedorForm
-          valoresPrevios={proveedor as unknown as Record<string, string | number | null>}
-          guardando={guardando}
-          onGuardar={guardar}
-          textoBoton="Guardar cambios"
-        />
+        <>
+          <ProveedorForm
+            valoresPrevios={proveedor as unknown as Record<string, string | number | null>}
+            guardando={guardando}
+            onGuardar={guardar}
+            textoBoton="Guardar cambios"
+          />
+          <HistorialCambios tabla="proveedores" registroId={proveedor.id} secciones={seccionesProveedor} />
+        </>
       )}
     </div>
   );

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import HistorialCambios from "@/components/HistorialCambios";
 import { supabase } from "@/lib/supabaseClient";
 import { seccionesCongreso } from "@/lib/congresoFields";
 import InscripcionForm from "@/components/InscripcionForm";
@@ -111,6 +112,7 @@ export default function EditarAsistenteCongresoPage() {
             onGuardar={guardar}
             textoBoton="Guardar cambios"
           />
+          <HistorialCambios tabla="asistentes_congreso" registroId={asistente.id} secciones={seccionesCongreso} />
         </>
       )}
     </div>

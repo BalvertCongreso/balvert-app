@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import HistorialCambios from "@/components/HistorialCambios";
 import { supabase } from "@/lib/supabaseClient";
 import { seccionesExcursion } from "@/lib/excursionFields";
 import InscripcionForm from "@/components/InscripcionForm";
@@ -108,6 +109,7 @@ export default function EditarAsistenteExcursionPage() {
             onGuardar={guardar}
             textoBoton="Guardar cambios"
           />
+          <HistorialCambios tabla="excursion" registroId={asistente.id} secciones={seccionesExcursion} />
         </>
       )}
     </div>

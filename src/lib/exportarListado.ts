@@ -175,6 +175,23 @@ function fechaATexto(fecha: Date, conHora: boolean): string {
   return conHora ? `${base} ${dos(fecha.getUTCHours())}:${dos(fecha.getUTCMinutes())}` : base;
 }
 
+// Valor en texto legible (fechas dd/mm/aaaa, booleanos Sí/No, coma decimal).
+// Lo usa también el historial de cambios de las fichas.
+export function textoLegible(valor: unknown, tipo?: CampoTipo): string | null {
+  const celda = aCelda(valor, tipo);
+  switch (celda.tipo) {
+    case "vacio":
+      return null;
+    case "numero":
+      return String(celda.numero).replace(".", ",");
+    case "fecha":
+    case "fecha-hora":
+      return fechaATexto(celda.fecha, celda.tipo === "fecha-hora");
+    case "texto":
+      return celda.texto;
+  }
+}
+
 function valorDeColumna<T>(fila: T, col: ColumnaExport<T>): Celda {
   const bruto = col.valor ? col.valor(fila) : (fila as Record<string, unknown>)[col.key];
   return aCelda(bruto, col.tipo);
