@@ -14,6 +14,7 @@ const enlaces = [
   { href: "/gala", label: "Gala" },
   { href: "/excursion", label: "Excursión" },
   { href: "/check-in", label: "Check-in" },
+  { href: "/documentos", label: "Documentos" },
   { href: "/tareas", label: "Tareas" },
   { href: "/captacion", label: "Captación" },
   { href: "/contactos", label: "Contactos" },

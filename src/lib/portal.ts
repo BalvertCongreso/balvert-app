@@ -17,6 +17,30 @@ export const DURACION_ENLACE_MS = 15 * 60 * 1000;
 export const DURACION_SESION_MS = 7 * 24 * 60 * 60 * 1000;
 export const MAX_ENLACES_POR_HORA = 3;
 
+
+// Dominios desde los que se sirve la app. Los enlaces de los emails se
+// construyen con el origen de la petición (app.balvert.es aún no está activo), pero solo
+// si es uno de estos: la cabecera Origin la puede inventar cualquiera, y un
+// enlace legítimo de secretaria@balvert.es que apuntara a otro dominio le
+// regalaría el token a quien lo controle.
+const ORIGEN_POR_DEFECTO = "https://balvert-2027-app.vercel.app";
+export function origenDeConfianza(req: Request): string {
+  try {
+    const url = new URL(req.url);
+    const host = url.hostname;
+    if (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "balvert-2027-app.vercel.app" ||
+      host === "balvert.es" ||
+      host.endsWith(".balvert.es")
+    ) {
+      return url.origin;
+    }
+  } catch {}
+  return ORIGEN_POR_DEFECTO;
+}
+
 export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function generarToken(): string {
@@ -118,9 +142,9 @@ export async function sesionPortal(): Promise<SesionPortal | null> {
 // de identidad (y el resto de datos internos de la fila) no se leen nunca
 // desde el portal.
 export const COLUMNAS_ENTRADA: Record<Tabla, string> = {
-  congreso: "id, nombre, tipo_acceso, empresa_entidad, categoria_patrocinio, edicion_id, qr_codigo",
-  gala: "id, nombre_asistente, menu, empresa_entidad, categoria_patrocinio, edicion_id, qr_codigo",
-  excursion: "id, nombre_asistente, tipo_entrada, empresa_entidad, categoria_patrocinio, edicion_id, qr_codigo",
+  congreso: "id, nombre, tipo_acceso, empresa_entidad, categoria_patrocinio, edicion_id, qr_codigo, recibo_url, referencia_pago_online",
+  gala: "id, nombre_asistente, menu, empresa_entidad, categoria_patrocinio, edicion_id, qr_codigo, recibo_url, referencia_pago_online",
+  excursion: "id, nombre_asistente, tipo_entrada, empresa_entidad, categoria_patrocinio, edicion_id, qr_codigo, recibo_url, referencia_pago_online",
 };
 
 // Consulta base de las entradas de un email en la edición activa. Quien la
@@ -132,4 +156,43 @@ export function consultaEntradas(supabase: SupabaseClient, tabla: Tabla, edicion
     .select(COLUMNAS_ENTRADA[tabla])
     .eq("edicion_id", edicionId)
     .ilike(CAMPO_EMAIL[tabla], patronEmailExacto(email));
+}
+
+export interface DocumentoPortal {
+  id: string;
+  titulo: string;
+  descripcion: string | null;
+  nombre_archivo: string;
+  ruta_archivo: string;
+}
+
+// Documentos de la edición activa que le corresponden a este email:
+// "todos_asistentes" si tiene alguna entrada, "todos_patrocinadores" si es
+// contacto de alguna empresa, y los de "patrocinador" de SUS empresas.
+export async function documentosVisibles(
+  supabase: SupabaseClient,
+  edicionId: string,
+  email: string
+): Promise<DocumentoPortal[]> {
+  const [conEntradas, empresas] = await Promise.all([
+    tieneEntradas(supabase, edicionId, email),
+    empresasDelEmail(supabase, edicionId, email),
+  ]);
+  const filtros: string[] = [];
+  if (conEntradas) filtros.push("destino.eq.todos_asistentes");
+  if (empresas.length > 0) {
+    filtros.push("destino.eq.todos_patrocinadores");
+    // Ids que vienen de la base de datos (uuid), no del navegador.
+    filtros.push(`and(destino.eq.patrocinador,patrocinador_id.in.(${empresas.map((e) => e.id).join(",")}))`);
+  }
+  if (filtros.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("documentos")
+    .select("id, titulo, descripcion, nombre_archivo, ruta_archivo")
+    .eq("edicion_id", edicionId)
+    .or(filtros.join(","))
+    .order("creado", { ascending: false });
+  if (error) throw new Error(`documentosVisibles: ${error.message}`);
+  return data ?? [];
 }

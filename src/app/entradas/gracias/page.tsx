@@ -11,6 +11,13 @@ export default function GraciasPagoPage() {
           Revisa tu email en unos minutos: te hemos enviado tus entradas con código QR. Preséntalas
           (en el móvil o impresas) en el acceso correspondiente.
         </p>
+        <p className="mt-3 text-sm text-zinc-600">
+          En tu{" "}
+          <a href="/portal" className="font-medium text-[var(--balvert-azul-oscuro)] hover:underline">
+            área de cliente
+          </a>{" "}
+          tienes tus entradas, el recibo del pago y puedes pedir factura.
+        </p>
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { crearClienteServicio } from "@/lib/supabaseServidor";
 import { crearClienteStripe } from "@/lib/stripe";
 import { enviarEmailConVariasEntradas, type EntradaParaEmail } from "@/lib/entradaEmail";
 import { NOMBRE_TABLA_SQL, construirDatosEntrada, type Tabla } from "@/lib/entradaDatos";
+import { origenDeConfianza } from "@/lib/portal";
 import { gruposSinDocumentos, type GruposCompra, type PersonaCongreso, type PersonaGala } from "@/lib/compraPendiente";
 
 export const runtime = "nodejs";
@@ -104,6 +105,21 @@ export async function POST(req: Request) {
   // "payment"; session.id como último recurso si no llegara a existir.
   const referencia = (typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id) || session.id;
 
+  // Enlace al recibo que genera Stripe para este cobro (el portal lo enseña
+  // como "Ver recibo del pago"). Si no se consigue, las entradas se crean
+  // igual, sin recibo.
+  let reciboUrl: string | null = null;
+  if (typeof session.payment_intent === "string" || session.payment_intent) {
+    try {
+      const idPago = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent!.id;
+      const pago = await stripe.paymentIntents.retrieve(idPago, { expand: ["latest_charge"] });
+      const cargo = pago.latest_charge;
+      reciboUrl = (typeof cargo === "object" && cargo?.receipt_url) || null;
+    } catch (e) {
+      console.error(`Webhook Stripe: no se pudo leer el recibo (referencia ${referencia})`, e instanceof Error ? e.message : e);
+    }
+  }
+
   const entradasParaEmail: EntradaParaEmail[] = [];
   const filasParaMarcarEnviadas: { tabla: Tabla; id: string }[] = [];
 
@@ -150,6 +166,7 @@ export async function POST(req: Request) {
         entrada_enviada: "No" as const,
         metodo_pago: "Pasarela online" as const,
         referencia_pago_online: referencia,
+        recibo_url: reciboUrl,
       };
 
       let fila: Record<string, unknown>;
@@ -241,7 +258,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ recibido: true, ya_procesado: true });
   }
 
-  const resultado = await enviarEmailConVariasEntradas(compradorEmail, entradasParaEmail);
+  const resultado = await enviarEmailConVariasEntradas(compradorEmail, entradasParaEmail, origenDeConfianza(req));
   if (resultado.enviado) {
     for (const { tabla, id } of filasParaMarcarEnviadas) {
       await supabase.from(NOMBRE_TABLA_SQL[tabla]).update({ entrada_enviada: "Sí" }).eq("id", id);

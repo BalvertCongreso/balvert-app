@@ -10,6 +10,7 @@ import {
   hashToken,
   idEdicionActiva,
   normalizarEmail,
+  origenDeConfianza,
   tieneEntradas,
 } from "@/lib/portal";
 
@@ -17,29 +18,6 @@ export const runtime = "nodejs";
 
 const MENSAJE_GENERICO =
   "Si ese email tiene entradas o es de una empresa patrocinadora, te hemos enviado un enlace para entrar. Revisa tu bandeja de entrada (y la carpeta de spam). El enlace caduca en 15 minutos.";
-
-// Dominios desde los que se sirve la app. El enlace del email se construye
-// con el origen de la petición (app.balvert.es aún no está activo), pero solo
-// si es uno de estos: la cabecera Origin la puede inventar cualquiera, y un
-// enlace legítimo de secretaria@balvert.es que apuntara a otro dominio le
-// regalaría el token a quien lo controle.
-const ORIGEN_POR_DEFECTO = "https://balvert-2027-app.vercel.app";
-function origenDeConfianza(req: Request): string {
-  try {
-    const url = new URL(req.url);
-    const host = url.hostname;
-    if (
-      host === "localhost" ||
-      host === "127.0.0.1" ||
-      host === "balvert-2027-app.vercel.app" ||
-      host === "balvert.es" ||
-      host.endsWith(".balvert.es")
-    ) {
-      return url.origin;
-    }
-  } catch {}
-  return ORIGEN_POR_DEFECTO;
-}
 
 function construirEmailHtml(enlace: string) {
   return `

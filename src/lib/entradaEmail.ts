@@ -22,7 +22,7 @@ function construirEmailHtml(nombre: string | null, evento: string) {
   `;
 }
 
-function construirEmailHtmlMultiple(entradas: EntradaParaEmail[]) {
+function construirEmailHtmlMultiple(entradas: EntradaParaEmail[], origen: string | null) {
   const bloques = entradas
     .map(
       (e, i) => `
@@ -42,6 +42,7 @@ function construirEmailHtmlMultiple(entradas: EntradaParaEmail[]) {
     <p>Hola,</p>
     <p>Aquí tienes ${entradas.length === 1 ? "tu entrada" : "tus entradas"} para BALVERT 2027. Presenta cada una (en el móvil o impresa) en el acceso correspondiente; se validará escaneando el código.</p>
     ${bloques}
+    ${origen ? `<p style="font-size: 14px;">En tu <a href="${origen}/portal" style="color: #2f7ea8;">área de cliente</a> tienes tus entradas, el recibo del pago y puedes pedir factura: entra con este mismo email.</p>` : ""}
     <p style="font-size: 13px; color: #6b7280;">Si tienes cualquier duda, responde a este email.</p>
   </div>
   `;
@@ -103,7 +104,13 @@ export async function enviarEmailConEntrada(
 // varias entradas a la vez (de un tipo o de varios: Congreso, Cena de gala,
 // Excursión). Se manda UN solo email al comprador con todas las imágenes
 // adjuntas, en vez de un email por entrada.
-export async function enviarEmailConVariasEntradas(email: string, entradas: EntradaParaEmail[]): Promise<ResultadoEnvio> {
+// origen: dirección de la app para el enlace al área de cliente (sin él, el
+// email no lo incluye).
+export async function enviarEmailConVariasEntradas(
+  email: string,
+  entradas: EntradaParaEmail[],
+  origen: string | null = null
+): Promise<ResultadoEnvio> {
   if (!process.env.RESEND_API_KEY) {
     return { enviado: false, error: "Falta RESEND_API_KEY en el servidor (.env.local)." };
   }
@@ -118,7 +125,7 @@ export async function enviarEmailConVariasEntradas(email: string, entradas: Entr
       from: "BALVERT 2027 <secretaria@balvert.es>",
       to: email,
       subject: entradas.length === 1 ? `Tu entrada — ${entradas[0].datos.evento} BALVERT 2027` : "Tus entradas — BALVERT 2027",
-      html: construirEmailHtmlMultiple(entradas),
+      html: construirEmailHtmlMultiple(entradas, origen),
       attachments: entradas.map((e, i) => ({
         filename: `entrada-${e.tabla}-${e.qrCodigo}.png`,
         content: imagenes[i],
