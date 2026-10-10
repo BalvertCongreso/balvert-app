@@ -42,12 +42,19 @@ export interface ColumnaExport<T> {
   despuesDe?: string;
 }
 
+// Etiquetas para columnas de la tabla que no salen en ningún formulario.
+const ETIQUETAS_CONOCIDAS: Record<string, string> = {
+  recibo_url: "Recibo de pago (enlace)",
+};
+
 // Columnas internas que nunca se descargan: identificadores técnicos y el
 // código del QR de la entrada (quien lo tenga puede entrar con él).
 const SIEMPRE_EXCLUIDAS = new Set(["id", "edicion_id", "qr_codigo"]);
 
 // Columnas en el orden de los formularios (*Fields.ts), con sus etiquetas, más
-// las que la pantalla añada (las que tienen `despuesDe` se intercalan).
+// las que la pantalla añada (las que tienen `despuesDe` se intercalan). Un
+// extra con la misma clave que un campo del formulario lo sustituye (p. ej.
+// para darle una etiqueta más clara fuera del contexto del formulario).
 export function columnasDesdeSecciones<T>(
   secciones: SeccionDef[],
   extras: ColumnaExport<T>[] = []
@@ -56,6 +63,11 @@ export function columnasDesdeSecciones<T>(
     s.campos.map((c) => ({ key: c.key, label: c.label, tipo: c.tipo }))
   );
   for (const extra of extras) {
+    const existente = resultado.findIndex((c) => c.key === extra.key);
+    if (existente >= 0) {
+      resultado[existente] = { ...resultado[existente], ...extra };
+      continue;
+    }
     const pos = extra.despuesDe ? resultado.findIndex((c) => c.key === extra.despuesDe) : -1;
     if (pos >= 0) resultado.splice(pos + 1, 0, extra);
     else resultado.push(extra);
@@ -81,7 +93,7 @@ function completarColumnas<T>(
     for (const key of Object.keys(fila as object)) {
       if (conocidas.has(key)) continue;
       conocidas.add(key);
-      resultado.push({ key, label: etiquetaDesdeClave(key) });
+      resultado.push({ key, label: ETIQUETAS_CONOCIDAS[key] ?? etiquetaDesdeClave(key) });
     }
   }
   return resultado;

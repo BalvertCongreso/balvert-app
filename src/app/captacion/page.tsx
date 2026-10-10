@@ -36,6 +36,10 @@ const CAMPOS_BUSQUEDA: (keyof ProspectoPatrocinio)[] = [
 
 function columnas(resumen: Record<string, ResumenContacto>): ColumnaExport<ProspectoPatrocinio>[] {
   return columnasDesdeSecciones<ProspectoPatrocinio>(seccionesProspecto, [
+    { key: "contacto_nombre", label: "Contacto — Nombre" },
+    { key: "contacto_cargo", label: "Contacto — Cargo" },
+    { key: "contacto_email", label: "Contacto — Email" },
+    { key: "contacto_telefono", label: "Contacto — Teléfono" },
     { key: "num_contactos", label: "Nº de contactos", valor: (p) => resumen[p.id]?.numero ?? 0 },
     { key: "ultimo_comentario", label: "Último comentario", valor: (p) => resumen[p.id]?.ultimoComentario },
   ]);
