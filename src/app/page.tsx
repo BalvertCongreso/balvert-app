@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { obtenerEdicionActiva } from "@/lib/edicionActiva";
+import { ORIGEN_PUBLICO } from "@/lib/dominio";
 import type {
   Edicion,
   Patrocinador,
@@ -38,7 +39,8 @@ function Tarjeta({
 
 function EnlaceInscripcion() {
   const [copiado, setCopiado] = useState(false);
-  const url = typeof window !== "undefined" ? `${window.location.origin}/entradas` : "/entradas";
+  // Siempre el dominio público, aunque el panel se abra desde vercel.app.
+  const url = `${ORIGEN_PUBLICO}/entradas`;
 
   async function copiar() {
     try {

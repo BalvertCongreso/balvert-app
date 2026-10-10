@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { crearClienteServicio } from "@/lib/supabaseServidor";
 import { NOMBRE_TABLA_SQL, type Tabla } from "@/lib/entradaDatos";
+import { ORIGEN_PUBLICO } from "@/lib/dominio";
 
 // Portal de clientes (asistentes y patrocinadores). NO usa Supabase Auth: las
 // políticas RLS del resto de tablas dejan hacer todo a cualquier sesión de
@@ -18,27 +19,22 @@ export const DURACION_SESION_MS = 7 * 24 * 60 * 60 * 1000;
 export const MAX_ENLACES_POR_HORA = 3;
 
 
-// Dominios desde los que se sirve la app. Los enlaces de los emails se
-// construyen con el origen de la petición (app.balvert.es aún no está activo), pero solo
-// si es uno de estos: la cabecera Origin la puede inventar cualquiera, y un
-// enlace legítimo de secretaria@balvert.es que apuntara a otro dominio le
-// regalaría el token a quien lo controle.
-const ORIGEN_POR_DEFECTO = "https://balvert-2027-app.vercel.app";
+// Dominio de los enlaces de los emails (portal, entradas, avisos de
+// documentos): siempre app.balvert.es, venga la petición de donde venga
+// (balvert-2027-app.vercel.app, el webhook de Stripe…). Nunca se usa un
+// dominio que mande la petición: la cabecera Origin o el Host los puede
+// inventar cualquiera, y un enlace legítimo de secretaria@balvert.es que
+// apuntara a otro dominio le regalaría el token a quien lo controle. La única
+// excepción es el ordenador de desarrollo (localhost), para poder probar los
+// enlaces en local.
+const HOSTS_DESARROLLO = new Set(["localhost", "127.0.0.1"]);
+
 export function origenDeConfianza(req: Request): string {
   try {
     const url = new URL(req.url);
-    const host = url.hostname;
-    if (
-      host === "localhost" ||
-      host === "127.0.0.1" ||
-      host === "balvert-2027-app.vercel.app" ||
-      host === "balvert.es" ||
-      host.endsWith(".balvert.es")
-    ) {
-      return url.origin;
-    }
+    if (HOSTS_DESARROLLO.has(url.hostname)) return url.origin;
   } catch {}
-  return ORIGEN_POR_DEFECTO;
+  return ORIGEN_PUBLICO;
 }
 
 export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
