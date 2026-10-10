@@ -26,7 +26,7 @@ async function resumenDatosAsociados(edicionId: string): Promise<string> {
         .select("id", { count: "exact", head: true })
         .eq("edicion_id", edicionId);
       // Si una tabla no se puede consultar (permisos), simplemente no se lista.
-      return !error && count ? `${count} ${etiqueta}` : null;
+      return !error && count ? `${etiqueta}: ${count}` : null;
     })
   );
   return recuentos.filter(Boolean).join(", ");
