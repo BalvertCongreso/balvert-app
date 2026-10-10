@@ -1,3 +1,6 @@
 {
-  "crons": [{ "path": "/api/limpieza/compras-pendientes", "schedule": "0 4 * * *" }]
+  "crons": [
+    { "path": "/api/limpieza/compras-pendientes", "schedule": "0 4 * * *" },
+    { "path": "/api/encuestas/pendientes", "schedule": "0 8 * * *" }
+  ]
 }

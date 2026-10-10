@@ -37,10 +37,11 @@ if (typeof window !== "undefined") {
 // Qué app se ofrece instalar en cada página. En el portal, solo en
 // /portal/inicio (con sesión): en /portal/entrar la URL lleva el token de un
 // solo uso, y en iPhone "Añadir a pantalla de inicio" guardaría esa URL.
-// En las páginas públicas (entradas, restablecer contraseña…) ninguna.
+// En las páginas públicas (entradas, restablecer contraseña, cuestionarios…)
+// ninguna.
 type Modo = "panel" | "portal" | null;
 
-const RUTAS_SIN_AVISO = ["/entradas", "/restablecer-contrasena", "/inscripcion-congreso"];
+const RUTAS_SIN_AVISO = ["/entradas", "/restablecer-contrasena", "/inscripcion-congreso", "/encuesta"];
 
 function modoDeRuta(pathname: string): Modo {
   if (pathname === "/portal" || pathname.startsWith("/portal/")) {

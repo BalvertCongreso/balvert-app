@@ -15,6 +15,7 @@ const enlaces = [
   { href: "/excursion", label: "Excursión" },
   { href: "/check-in", label: "Check-in" },
   { href: "/documentos", label: "Documentos" },
+  { href: "/cuestionarios", label: "Cuestionarios" },
   { href: "/tareas", label: "Tareas" },
   { href: "/captacion", label: "Captación" },
   { href: "/contactos", label: "Contactos" },

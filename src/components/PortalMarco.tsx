@@ -7,7 +7,7 @@ export default function PortalMarco({
   children,
 }: {
   subtitulo: string;
-  ancho?: "max-w-md" | "max-w-3xl";
+  ancho?: "max-w-md" | "max-w-2xl" | "max-w-3xl";
   accion?: React.ReactNode;
   children: React.ReactNode;
 }) {

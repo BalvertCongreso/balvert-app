@@ -22,13 +22,19 @@ function esRutaPortal(pathname: string) {
   return pathname === "/portal" || pathname.startsWith("/portal/");
 }
 
+// Cuestionarios de satisfacción: /encuesta/<enlace personal>, sin sesión (el
+// enlace es lo que autoriza; ver /api/encuesta/responder). Solo ese prefijo.
+function esRutaEncuesta(pathname: string) {
+  return pathname.startsWith("/encuesta/");
+}
+
 // Rutas que ocupan todo el ancho de pantalla en vez del max-w-6xl centrado habitual.
 const RUTAS_ANCHO_COMPLETO: string[] = ["/"];
 
 function Contenido({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { session, cargando } = useAuth();
-  const esRutaPublica = RUTAS_PUBLICAS.includes(pathname ?? "") || esRutaPortal(pathname ?? "");
+  const esRutaPublica = RUTAS_PUBLICAS.includes(pathname ?? "") || esRutaPortal(pathname ?? "") || esRutaEncuesta(pathname ?? "");
   const esAnchoCompleto = RUTAS_ANCHO_COMPLETO.includes(pathname ?? "");
 
   if (esRutaPublica) {
