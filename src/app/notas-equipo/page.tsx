@@ -8,6 +8,7 @@ export default function NotasEquipoPage() {
       filtrarPorUsuarioActual={false}
       titulo="Notas del equipo"
       descripcion="Tablón compartido: Ariadna y Ariosto ven y escriben aquí las mismas notas."
+      conBuscadorYDescarga
     />
   );
 }

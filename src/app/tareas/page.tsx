@@ -7,10 +7,51 @@ import { obtenerEdicionActiva } from "@/lib/edicionActiva";
 import TareaComentarios from "@/components/TareaComentarios";
 import { useAuth } from "@/context/AuthContext";
 import { obtenerUltimaLectura } from "@/lib/comentariosLeidos";
-import type { Edicion, Tarea } from "@/types/database";
+import { obtenerTodasLasFilas } from "@/lib/paginarTodo";
+import { seccionesTarea } from "@/lib/tareaFields";
+import { obtenerNombresPatrocinadores } from "@/lib/nombresPatrocinadores";
+import {
+  columnasDesdeSecciones,
+  coincideBusqueda,
+  textoRecuento,
+  type CampoBusqueda,
+  type ColumnaExport,
+} from "@/lib/exportarListado";
+import HerramientasListado from "@/components/HerramientasListado";
+import type { Edicion, Tarea, TareaComentario } from "@/types/database";
 
 function hoyISO(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+// La entidad relacionada se guarda como id de patrocinador: se busca y se
+// descarga por su nombre.
+function camposBusqueda(nombresPatro: Record<string, string>): CampoBusqueda<Tarea>[] {
+  return [
+    "tarea",
+    "responsable",
+    "fase",
+    "prioridad",
+    "estado",
+    "notas",
+    (t) => (t.entidad_relacionada ? nombresPatro[t.entidad_relacionada] : null),
+  ];
+}
+
+function columnas(
+  nombresPatro: Record<string, string>,
+  numComentarios: Record<string, number>
+): ColumnaExport<Tarea>[] {
+  return columnasDesdeSecciones<Tarea>(seccionesTarea, [
+    {
+      key: "entidad_relacionada",
+      label: "Entidad relacionada",
+      despuesDe: "tarea",
+      valor: (t) =>
+        t.entidad_relacionada ? nombresPatro[t.entidad_relacionada] ?? "(patrocinador borrado)" : null,
+    },
+    { key: "num_comentarios", label: "Nº de comentarios", valor: (t) => numComentarios[t.id] ?? 0 },
+  ]);
 }
 
 export default function TareasPage() {
@@ -22,6 +63,8 @@ export default function TareasPage() {
   const [numComentarios, setNumComentarios] = useState<Record<string, number>>({});
   const [tareasConNuevo, setTareasConNuevo] = useState<Record<string, boolean>>({});
   const [expandidaId, setExpandidaId] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState("");
+  const [nombresPatro, setNombresPatro] = useState<Record<string, string>>({});
 
   async function cargarNumComentarios(ids: string[]) {
     if (ids.length === 0) {
@@ -29,14 +72,22 @@ export default function TareasPage() {
       setTareasConNuevo({});
       return;
     }
-    const { data, error } = await supabase
-      .from("tarea_comentarios")
-      .select("tarea_id, autor, fecha_creacion")
-      .in("tarea_id", ids);
-    if (error) return;
+    let data: Pick<TareaComentario, "tarea_id" | "autor" | "fecha_creacion">[];
+    try {
+      data = await obtenerTodasLasFilas((desde, hasta) =>
+        supabase
+          .from("tarea_comentarios")
+          .select("tarea_id, autor, fecha_creacion")
+          .in("tarea_id", ids)
+          .order("id", { ascending: true })
+          .range(desde, hasta)
+      );
+    } catch {
+      return;
+    }
     const conteo: Record<string, number> = {};
     const conNuevo: Record<string, boolean> = {};
-    for (const fila of data ?? []) {
+    for (const fila of data) {
       conteo[fila.tarea_id] = (conteo[fila.tarea_id] ?? 0) + 1;
       if (usuario && fila.autor !== usuario) {
         const ultimaLectura = obtenerUltimaLectura(usuario, fila.tarea_id);
@@ -54,23 +105,24 @@ export default function TareasPage() {
     const edicionActiva = await obtenerEdicionActiva();
     setEdicion(edicionActiva);
 
-    let query = supabase
-      .from("tareas")
-      .select("*")
-      .order("fecha_limite", { ascending: true, nullsFirst: false });
-
-    if (edicionActiva) {
-      query = query.eq("edicion_id", edicionActiva.id);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      setError(error.message);
-    } else {
+    try {
+      const datos = await obtenerTodasLasFilas<Tarea>((desde, hasta) => {
+        let query = supabase
+          .from("tareas")
+          .select("*")
+          .order("fecha_limite", { ascending: true, nullsFirst: false })
+          .order("id", { ascending: true });
+        if (edicionActiva) {
+          query = query.eq("edicion_id", edicionActiva.id);
+        }
+        return query.range(desde, hasta);
+      });
+      setNombresPatro(await obtenerNombresPatrocinadores());
       setError(null);
-      setTareas(data ?? []);
-      cargarNumComentarios((data ?? []).map((t) => t.id));
+      setTareas(datos);
+      cargarNumComentarios(datos.map((t) => t.id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error inesperado.");
     }
     setCargando(false);
   }
@@ -110,13 +162,15 @@ export default function TareasPage() {
     }
   }
 
+  const filtradas = tareas.filter((t) => coincideBusqueda(t, camposBusqueda(nombresPatro), busqueda));
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[var(--balvert-marron)]">Tareas</h1>
           <p className="text-sm text-zinc-600">
-            {cargando ? "Cargando…" : `${tareas.length} tarea(s)`}
+            {textoRecuento(cargando, filtradas.length, tareas.length, "tarea(s)")}
             {edicion?.nombre && (
               <span className="ml-2 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500">
                 Edición: {edicion.nombre}
@@ -132,6 +186,18 @@ export default function TareasPage() {
           + Añadir tarea
         </Link>
       </div>
+
+      <HerramientasListado
+        busqueda={busqueda}
+        onBusqueda={setBusqueda}
+        placeholder="Buscar por tarea, responsable, fase, estado, entidad…"
+        descarga={{
+          filas: filtradas,
+          columnas: columnas(nombresPatro, numComentarios),
+          pantalla: "Tareas",
+          edicion: edicion?.nombre,
+        }}
+      />
 
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -156,7 +222,7 @@ export default function TareasPage() {
               </tr>
             </thead>
             <tbody>
-              {tareas.map((t) => {
+              {filtradas.map((t) => {
                 const completada = t.estado === "✅ Completada";
                 const expandida = expandidaId === t.id;
                 return (
@@ -232,10 +298,12 @@ export default function TareasPage() {
                   </Fragment>
                 );
               })}
-              {!cargando && tareas.length === 0 && (
+              {!cargando && filtradas.length === 0 && (
                 <tr>
                   <td colSpan={9} className="px-4 py-8 text-center text-zinc-500">
-                    Todavía no hay tareas. Añade la primera con el botón de arriba.
+                    {tareas.length === 0
+                      ? "Todavía no hay tareas. Añade la primera con el botón de arriba."
+                      : "Sin resultados para esa búsqueda."}
                   </td>
                 </tr>
               )}

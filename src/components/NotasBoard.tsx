@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
+import { obtenerTodasLasFilas } from "@/lib/paginarTodo";
+import { coincideBusqueda, textoRecuento, type ColumnaExport } from "@/lib/exportarListado";
+import HerramientasListado from "@/components/HerramientasListado";
 
 interface NotaBase {
   id: string;
@@ -18,6 +21,8 @@ interface Props {
   filtrarPorUsuarioActual: boolean;
   titulo: string;
   descripcion: string;
+  // Buscador y descarga (solo en Notas del equipo, no en Mis notas).
+  conBuscadorYDescarga?: boolean;
 }
 
 function formatearFecha(iso: string) {
@@ -36,6 +41,7 @@ export default function NotasBoard({
   filtrarPorUsuarioActual,
   titulo,
   descripcion,
+  conBuscadorYDescarga = false,
 }: Props) {
   const { usuario } = useAuth();
   const [notas, setNotas] = useState<NotaBase[]>([]);
@@ -45,24 +51,26 @@ export default function NotasBoard({
   const [enviando, setEnviando] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [textoEdicion, setTextoEdicion] = useState("");
+  const [busqueda, setBusqueda] = useState("");
 
   async function cargar() {
     setCargando(true);
-    let query = supabase
-      .from(tabla)
-      .select("*")
-      .order("fecha_creacion", { ascending: false });
-
-    if (filtrarPorUsuarioActual && usuario) {
-      query = query.eq(campoAutor, usuario);
-    }
-
-    const { data, error } = await query;
-    if (error) {
-      setError(error.message);
-    } else {
+    try {
+      const datos = await obtenerTodasLasFilas<NotaBase>((desde, hasta) => {
+        let query = supabase
+          .from(tabla)
+          .select("*")
+          .order("fecha_creacion", { ascending: false })
+          .order("id", { ascending: true });
+        if (filtrarPorUsuarioActual && usuario) {
+          query = query.eq(campoAutor, usuario);
+        }
+        return query.range(desde, hasta);
+      });
       setError(null);
-      setNotas((data as NotaBase[]) ?? []);
+      setNotas(datos);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error inesperado.");
     }
     setCargando(false);
   }
@@ -121,11 +129,27 @@ export default function NotasBoard({
     setNotas((prev) => prev.filter((n) => n.id !== id));
   }
 
+  const visibles = conBuscadorYDescarga
+    ? notas.filter((n) => coincideBusqueda(n, ["contenido", campoAutor], busqueda))
+    : notas;
+
+  const columnas: ColumnaExport<NotaBase>[] = [
+    { key: campoAutor, label: "Autor" },
+    { key: "contenido", label: "Nota" },
+    { key: "fecha_creacion", label: "Creada" },
+    { key: "fecha_actualizacion", label: "Última modificación" },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold text-[var(--balvert-marron)]">{titulo}</h1>
         <p className="text-sm text-zinc-600">{descripcion}</p>
+        {conBuscadorYDescarga && usuario && (
+          <p className="text-sm text-zinc-600">
+            {textoRecuento(cargando, visibles.length, notas.length, "nota(s)")}
+          </p>
+        )}
       </div>
 
       {!usuario && (
@@ -167,14 +191,25 @@ export default function NotasBoard({
         </form>
       )}
 
+      {conBuscadorYDescarga && usuario && (
+        <HerramientasListado
+          busqueda={busqueda}
+          onBusqueda={setBusqueda}
+          placeholder="Buscar en las notas o por autor…"
+          descarga={{ filas: visibles, columnas, pantalla: titulo }}
+        />
+      )}
+
       {cargando ? (
         <p className="text-sm text-zinc-500">Cargando…</p>
       ) : (
         <div className="flex flex-col gap-3">
-          {notas.length === 0 && usuario && (
-            <p className="text-sm text-zinc-500">Todavía no hay notas.</p>
+          {visibles.length === 0 && usuario && (
+            <p className="text-sm text-zinc-500">
+              {notas.length === 0 ? "Todavía no hay notas." : "Sin resultados para esa búsqueda."}
+            </p>
           )}
-          {notas.map((nota) => (
+          {visibles.map((nota) => (
             <div key={nota.id} className="rounded-lg border border-[var(--borde)] bg-white p-4">
               <div className="mb-2 flex items-center justify-between text-xs text-zinc-500">
                 <span className="font-semibold text-[var(--balvert-azul-oscuro)]">

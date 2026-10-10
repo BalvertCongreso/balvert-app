@@ -4,35 +4,58 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { obtenerEdicionActiva } from "@/lib/edicionActiva";
+import { obtenerTodasLasFilas } from "@/lib/paginarTodo";
+import { seccionesPatrocinador } from "@/lib/patrocinadorFields";
+import { columnasDesdeSecciones, coincideBusqueda, textoRecuento } from "@/lib/exportarListado";
+import HerramientasListado from "@/components/HerramientasListado";
 import type { Edicion, Patrocinador } from "@/types/database";
+
+const CAMPOS_BUSQUEDA: (keyof Patrocinador)[] = [
+  "categoria",
+  "empresa_entidad",
+  "nombre_comercial_cartel",
+  "contacto1_nombre",
+  "contacto1_email",
+  "contacto1_telefono",
+  "contacto2_nombre",
+  "contacto2_email",
+  "contacto2_telefono",
+  "ponente_nombre",
+  "razon_social_facturacion",
+  "cif_nif",
+  "email_contabilidad",
+];
+
+const COLUMNAS = columnasDesdeSecciones<Patrocinador>(seccionesPatrocinador);
 
 export default function PatrocinadoresPage() {
   const [patrocinadores, setPatrocinadores] = useState<Patrocinador[]>([]);
   const [edicion, setEdicion] = useState<Edicion | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState("");
 
   async function cargar() {
     setCargando(true);
     const edicionActiva = await obtenerEdicionActiva();
     setEdicion(edicionActiva);
 
-    let query = supabase
-      .from("patrocinadores")
-      .select("*")
-      .order("empresa_entidad", { ascending: true });
-
-    if (edicionActiva) {
-      query = query.eq("edicion_id", edicionActiva.id);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      setError(error.message);
-    } else {
+    try {
+      const datos = await obtenerTodasLasFilas<Patrocinador>((desde, hasta) => {
+        let query = supabase
+          .from("patrocinadores")
+          .select("*")
+          .order("empresa_entidad", { ascending: true })
+          .order("id", { ascending: true });
+        if (edicionActiva) {
+          query = query.eq("edicion_id", edicionActiva.id);
+        }
+        return query.range(desde, hasta);
+      });
       setError(null);
-      setPatrocinadores(data ?? []);
+      setPatrocinadores(datos);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error inesperado.");
     }
     setCargando(false);
   }
@@ -55,6 +78,10 @@ export default function PatrocinadoresPage() {
     setPatrocinadores((prev) => prev.filter((p) => p.id !== id));
   }
 
+  const filtrados = patrocinadores.filter((p) =>
+    coincideBusqueda(p, CAMPOS_BUSQUEDA, busqueda)
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -63,7 +90,7 @@ export default function PatrocinadoresPage() {
             Patrocinadores
           </h1>
           <p className="text-sm text-zinc-600">
-            {cargando ? "Cargando…" : `${patrocinadores.length} patrocinador(es)`}
+            {textoRecuento(cargando, filtrados.length, patrocinadores.length, "patrocinador(es)")}
             {edicion?.nombre && (
               <span className="ml-2 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500">
                 Edición: {edicion.nombre}
@@ -79,6 +106,18 @@ export default function PatrocinadoresPage() {
           + Añadir patrocinador
         </Link>
       </div>
+
+      <HerramientasListado
+        busqueda={busqueda}
+        onBusqueda={setBusqueda}
+        placeholder="Buscar por empresa, contacto, email, teléfono, categoría…"
+        descarga={{
+          filas: filtrados,
+          columnas: COLUMNAS,
+          pantalla: "Patrocinadores",
+          edicion: edicion?.nombre,
+        }}
+      />
 
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -103,7 +142,7 @@ export default function PatrocinadoresPage() {
               </tr>
             </thead>
             <tbody>
-              {patrocinadores.map((p) => (
+              {filtrados.map((p) => (
                 <tr key={p.id} className="border-t border-[var(--borde)]">
                   <td className="px-4 py-3">{p.categoria ?? "—"}</td>
                   <td className="px-4 py-3 font-medium">
@@ -135,11 +174,12 @@ export default function PatrocinadoresPage() {
                   </td>
                 </tr>
               ))}
-              {!cargando && patrocinadores.length === 0 && (
+              {!cargando && filtrados.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-zinc-500">
-                    Todavía no hay patrocinadores. Añade el primero con el botón de
-                    arriba.
+                    {patrocinadores.length === 0
+                      ? "Todavía no hay patrocinadores. Añade el primero con el botón de arriba."
+                      : "Sin resultados para esa búsqueda."}
                   </td>
                 </tr>
               )}

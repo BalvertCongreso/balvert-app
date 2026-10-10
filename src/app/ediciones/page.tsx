@@ -4,13 +4,28 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { borrarEdicion } from "@/lib/borrarEdicion";
+import { seccionesEdicion } from "@/lib/edicionFields";
+import { columnasDesdeSecciones, coincideBusqueda, textoRecuento } from "@/lib/exportarListado";
+import HerramientasListado from "@/components/HerramientasListado";
 import type { Edicion } from "@/types/database";
+
+const CAMPOS_BUSQUEDA: (keyof Edicion)[] = [
+  "nombre",
+  "anio",
+  "ciudad",
+  "lugar_congreso",
+  "lugar_gala",
+  "lugar_excursion",
+];
+
+const COLUMNAS = columnasDesdeSecciones<Edicion>(seccionesEdicion);
 
 export default function EdicionesPage() {
   const [ediciones, setEdiciones] = useState<Edicion[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [marcando, setMarcando] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState("");
 
   async function cargar() {
     setCargando(true);
@@ -60,13 +75,15 @@ export default function EdicionesPage() {
     setEdiciones((prev) => prev.filter((e) => e.id !== id));
   }
 
+  const filtradas = ediciones.filter((e) => coincideBusqueda(e, CAMPOS_BUSQUEDA, busqueda));
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[var(--balvert-marron)]">Ediciones</h1>
           <p className="text-sm text-zinc-600">
-            {cargando ? "Cargando…" : `${ediciones.length} edición(es)`}
+            {textoRecuento(cargando, filtradas.length, ediciones.length, "edición(es)")}
           </p>
         </div>
         <Link
@@ -77,6 +94,13 @@ export default function EdicionesPage() {
           + Añadir edición
         </Link>
       </div>
+
+      <HerramientasListado
+        busqueda={busqueda}
+        onBusqueda={setBusqueda}
+        placeholder="Buscar por nombre, año, ciudad, lugar…"
+        descarga={{ filas: filtradas, columnas: COLUMNAS, pantalla: "Ediciones" }}
+      />
 
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -100,7 +124,7 @@ export default function EdicionesPage() {
               </tr>
             </thead>
             <tbody>
-              {ediciones.map((e) => (
+              {filtradas.map((e) => (
                 <tr key={e.id} className="border-t border-[var(--borde)]">
                   <td className="px-4 py-3 font-medium">{e.nombre ?? "(sin nombre)"}</td>
                   <td className="px-4 py-3">{e.anio ?? "—"}</td>
@@ -139,10 +163,12 @@ export default function EdicionesPage() {
                   </td>
                 </tr>
               ))}
-              {!cargando && ediciones.length === 0 && (
+              {!cargando && filtradas.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-zinc-500">
-                    Todavía no hay ediciones. Añade la primera con el botón de arriba.
+                    {ediciones.length === 0
+                      ? "Todavía no hay ediciones. Añade la primera con el botón de arriba."
+                      : "Sin resultados para esa búsqueda."}
                   </td>
                 </tr>
               )}

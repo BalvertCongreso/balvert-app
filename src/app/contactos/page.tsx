@@ -4,7 +4,26 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { obtenerTodasLasFilas } from "@/lib/paginarTodo";
+import { seccionesContacto } from "@/lib/contactoFields";
+import { columnasDesdeSecciones, coincideBusqueda, textoRecuento } from "@/lib/exportarListado";
+import HerramientasListado from "@/components/HerramientasListado";
 import type { ContactoNewsletter } from "@/types/database";
+
+const CAMPOS_BUSQUEDA: (keyof ContactoNewsletter)[] = [
+  "nombre",
+  "apellidos",
+  "email",
+  "telefono",
+  "origen_lista",
+  "empresa",
+  "entidad_publica",
+  "nombre_colegio",
+  "nacionalidad",
+];
+
+const COLUMNAS = columnasDesdeSecciones<ContactoNewsletter>(seccionesContacto, [
+  { key: "fecha_alta", label: "Fecha de alta" },
+]);
 
 export default function ContactosPage() {
   const [contactos, setContactos] = useState<ContactoNewsletter[]>([]);
@@ -54,12 +73,9 @@ export default function ContactosPage() {
     new Set(contactos.map((c) => c.origen_lista).filter((o): o is string => Boolean(o)))
   ).sort();
 
-  const textoBusqueda = busqueda.trim().toLowerCase();
   const filtrados = contactos.filter((c) => {
     if (filtroOrigen && c.origen_lista !== filtroOrigen) return false;
-    if (!textoBusqueda) return true;
-    const texto = `${c.nombre ?? ""} ${c.apellidos ?? ""} ${c.email ?? ""}`.toLowerCase();
-    return texto.includes(textoBusqueda);
+    return coincideBusqueda(c, CAMPOS_BUSQUEDA, busqueda);
   });
 
   return (
@@ -68,11 +84,7 @@ export default function ContactosPage() {
         <div>
           <h1 className="text-2xl font-bold text-[var(--balvert-marron)]">Contactos</h1>
           <p className="text-sm text-zinc-600">
-            {cargando
-              ? "Cargando…"
-              : filtrados.length === contactos.length
-              ? `${contactos.length} contacto(s)`
-              : `${filtrados.length} de ${contactos.length} contacto(s)`}
+            {textoRecuento(cargando, filtrados.length, contactos.length, "contacto(s)")}
           </p>
         </div>
         <Link
@@ -84,14 +96,17 @@ export default function ContactosPage() {
         </Link>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <input
-          type="text"
-          className="campo-input max-w-sm"
-          placeholder="Buscar por nombre, apellidos o email…"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-        />
+      <HerramientasListado
+        busqueda={busqueda}
+        onBusqueda={setBusqueda}
+        placeholder="Buscar por nombre, email, teléfono, empresa…"
+        descarga={{
+          filas: filtrados,
+          columnas: COLUMNAS,
+          pantalla: "Contactos",
+          edicion: filtroOrigen || null,
+        }}
+      >
         <select
           className="campo-input max-w-xs"
           value={filtroOrigen}
@@ -104,7 +119,7 @@ export default function ContactosPage() {
             </option>
           ))}
         </select>
-      </div>
+      </HerramientasListado>
 
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
