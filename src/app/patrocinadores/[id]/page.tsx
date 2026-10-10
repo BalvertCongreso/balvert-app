@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import ArchivosPatrocinador from "@/components/ArchivosPatrocinador";
 import HistorialCambios from "@/components/HistorialCambios";
 import { seccionesPatrocinador } from "@/lib/patrocinadorFields";
 import { supabase } from "@/lib/supabaseClient";
+import { eliminarPatrocinador } from "@/lib/apiCliente";
 import PatrocinadorForm from "@/components/PatrocinadorForm";
 import CrearInvitaciones from "@/components/CrearInvitaciones";
 import type { Patrocinador, PatrocinadorInput } from "@/types/database";
@@ -51,9 +53,9 @@ export default function EditarPatrocinadorPage() {
       `¿Eliminar a "${patrocinador?.empresa_entidad ?? "este patrocinador"}"? Esta acción no se puede deshacer.`
     );
     if (!ok) return;
-    const { error } = await supabase.from("patrocinadores").delete().eq("id", id);
-    if (error) {
-      setError(error.message);
+    const fallo = await eliminarPatrocinador(id);
+    if (fallo) {
+      setError(fallo);
       return;
     }
     router.push("/patrocinadores");
@@ -106,6 +108,7 @@ export default function EditarPatrocinadorPage() {
             onGuardar={guardar}
             textoBoton="Guardar cambios"
           />
+          <ArchivosPatrocinador patrocinadorId={patrocinador.id} />
           <HistorialCambios
             tabla="patrocinadores"
             registroId={patrocinador.id}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { eliminarPatrocinador } from "@/lib/apiCliente";
 import { obtenerEdicionActiva } from "@/lib/edicionActiva";
 import { obtenerTodasLasFilas } from "@/lib/paginarTodo";
 import { seccionesPatrocinador } from "@/lib/patrocinadorFields";
@@ -70,9 +71,9 @@ export default function PatrocinadoresPage() {
     );
     if (!ok) return;
 
-    const { error } = await supabase.from("patrocinadores").delete().eq("id", id);
-    if (error) {
-      alert("No se pudo eliminar: " + error.message);
+    const fallo = await eliminarPatrocinador(id);
+    if (fallo) {
+      alert(fallo);
       return;
     }
     setPatrocinadores((prev) => prev.filter((p) => p.id !== id));

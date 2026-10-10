@@ -37,3 +37,15 @@ export async function subirArchivo(archivo: File): Promise<{ url: string; nombre
   if (!res.ok) throw new Error(data.error || "No se pudo subir el archivo.");
   return data;
 }
+
+// Borra un patrocinador junto con sus archivos internos (ver
+// /api/patrocinadores). Devuelve el mensaje de error, o null si fue bien.
+export async function eliminarPatrocinador(id: string): Promise<string | null> {
+  const res = await fetch(`/api/patrocinadores?id=${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: await cabeceraAutorizacion(),
+  });
+  if (res.ok) return null;
+  const data = await res.json().catch(() => ({}));
+  return data.error || "Error inesperado.";
+}
