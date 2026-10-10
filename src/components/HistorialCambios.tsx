@@ -78,8 +78,8 @@ export default function HistorialCambios({ tabla, registroId, secciones }: Props
   const [abierto, setAbierto] = useState(false);
 
   const campos: Record<string, { label: string; tipo?: CampoTipo }> = {};
-  for (const [key, label] of Object.entries(ETIQUETAS_EXTRA)) campos[key] = { label };
   for (const s of secciones) for (const c of s.campos) campos[c.key] = { label: c.label, tipo: c.tipo };
+  for (const [key, label] of Object.entries(ETIQUETAS_EXTRA)) campos[key] ??= { label };
 
   useEffect(() => {
     if (!abierto || entradas) return;
@@ -107,7 +107,9 @@ export default function HistorialCambios({ tabla, registroId, secciones }: Props
   }, [abierto, entradas, tabla, registroId]);
 
   function texto(campo: string, valor: unknown): string | null {
-    if (campo === "empresa_entidad" && typeof valor === "string") {
+    // En asistentes es el id del patrocinador vinculado; en patrocinadores
+    // es el propio nombre de la empresa.
+    if (campo === "empresa_entidad" && tabla !== "patrocinadores" && typeof valor === "string") {
       return nombresPatro[valor] ?? "(patrocinador borrado)";
     }
     return textoLegible(valor, campos[campo]?.tipo);
