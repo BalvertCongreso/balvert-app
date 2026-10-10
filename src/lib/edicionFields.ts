@@ -103,4 +103,26 @@ export const seccionesEdicion: SeccionDef[] = [
       },
     ],
   },
+  {
+    titulo: "Certificado de asistencia",
+    campos: [
+      {
+        key: "certificado_titulo",
+        label: "Título oficial del congreso (con el ordinal)",
+        tipo: "texto",
+        nota: 'Ej. "IV Congreso Internacional de Balsas y Vertederos". Sale en la frase del certificado y, en mayúsculas, en la cabecera.',
+      },
+      { key: "certificado_lugar", label: "Lugar", tipo: "texto", nota: 'Ej. "Barcelona": "…que ha tenido lugar en Barcelona…".' },
+      {
+        key: "certificado_dias",
+        label: "Días (tal cual se imprimen)",
+        tipo: "texto",
+        nota: 'Ej. "16 y 17 de marzo de 2027": "…los días 16 y 17 de marzo de 2027." Sin horas.',
+      },
+      { key: "certificado_cabecera_linea1", label: "Cabecera derecha — línea 1", tipo: "texto", nota: 'Ej. "16 y 17 DE MARZO".' },
+      { key: "certificado_cabecera_linea2", label: "Cabecera derecha — línea 2", tipo: "texto", nota: 'Ej. "2027 - BARCELONA".' },
+      { key: "certificado_firmante", label: "Quién firma", tipo: "texto", nota: "Sale en mayúsculas debajo de la firma." },
+      { key: "certificado_cargo", label: "Cargo de quien firma", tipo: "texto" },
+    ],
+  },
 ];

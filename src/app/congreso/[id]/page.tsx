@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { seccionesCongreso } from "@/lib/congresoFields";
 import InscripcionForm from "@/components/InscripcionForm";
 import EntradaQR from "@/components/EntradaQR";
+import CertificadoAsistente from "@/components/CertificadoAsistente";
 import type { AsistenteCongreso } from "@/types/database";
 
 export default function EditarAsistenteCongresoPage() {
@@ -104,6 +105,7 @@ export default function EditarAsistenteCongresoPage() {
               setAsistente((prev) => (prev ? { ...prev, ...datos } : prev))
             }
           />
+          {asistente.check_in_hecho === "Sí" && <CertificadoAsistente asistenteId={asistente.id} />}
           <InscripcionForm
             historialEmail={{ tabla: "asistentes_congreso", edicionId: asistente.edicion_id, registroId: asistente.id }}
             secciones={seccionesCongreso}

@@ -49,3 +49,24 @@ export async function eliminarPatrocinador(id: string): Promise<string | null> {
   const data = await res.json().catch(() => ({}));
   return data.error || "Error inesperado.";
 }
+
+// Descarga un archivo de una ruta del panel que exige sesión (no basta con un
+// enlace normal: hay que mandar la cabecera Authorization). Devuelve el
+// mensaje de error, o null si fue bien.
+export async function descargarConSesion(path: string, nombrePorDefecto: string): Promise<string | null> {
+  const res = await fetch(path, { headers: await cabeceraAutorizacion() });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    return data.error || "No se pudo descargar.";
+  }
+  const nombre = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? nombrePorDefecto;
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombre;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  return null;
+}

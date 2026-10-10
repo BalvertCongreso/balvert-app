@@ -138,7 +138,7 @@ export async function sesionPortal(): Promise<SesionPortal | null> {
 // de identidad (y el resto de datos internos de la fila) no se leen nunca
 // desde el portal.
 export const COLUMNAS_ENTRADA: Record<Tabla, string> = {
-  congreso: "id, nombre, tipo_acceso, empresa_entidad, categoria_patrocinio, edicion_id, qr_codigo, recibo_url, referencia_pago_online",
+  congreso: "id, nombre, tipo_acceso, empresa_entidad, categoria_patrocinio, edicion_id, qr_codigo, recibo_url, referencia_pago_online, check_in_hecho",
   gala: "id, nombre_asistente, menu, empresa_entidad, categoria_patrocinio, edicion_id, qr_codigo, recibo_url, referencia_pago_online",
   excursion: "id, nombre_asistente, tipo_entrada, empresa_entidad, categoria_patrocinio, edicion_id, qr_codigo, recibo_url, referencia_pago_online",
 };

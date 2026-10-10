@@ -25,6 +25,7 @@ interface EntradaPortal {
   detalleLabel: string | null;
   detalleValor: string | null;
   generada: boolean;
+  certificado: "disponible" | "pendiente" | "sin_nombre" | null;
 }
 
 interface CompraPortal {
@@ -95,7 +96,37 @@ function TarjetaEntrada({ entrada }: { entrada: EntradaPortal }) {
         ) : (
           <p className="mt-2 text-zinc-500">Tu entrada aún no está lista. Te avisaremos por email.</p>
         )}
+        {entrada.certificado && <Certificado entrada={entrada} />}
       </div>
+    </div>
+  );
+}
+
+// Certificado de asistencia (solo Congreso): se descarga en cuanto se hace
+// el check-in de la entrada. No se envía por email.
+function Certificado({ entrada }: { entrada: EntradaPortal }) {
+  return (
+    <div className="mt-3 rounded-md border border-[var(--borde)] bg-zinc-50 p-3">
+      <p className="font-semibold text-zinc-800">Certificado de asistencia</p>
+      {entrada.certificado === "disponible" ? (
+        <>
+          <p className="mb-2 text-zinc-600">Ya puedes descargar tu certificado de asistencia en PDF.</p>
+          <a
+            href={`/api/portal/certificado?id=${encodeURIComponent(entrada.id)}`}
+            className="inline-flex min-h-11 items-center rounded-md bg-[var(--balvert-azul-oscuro)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+          >
+            Descargar certificado de asistencia
+          </a>
+        </>
+      ) : entrada.certificado === "sin_nombre" ? (
+        <p className="text-zinc-500">
+          Para preparar tu certificado necesitamos tu nombre completo. Escríbenos a secretaria@balvert.es.
+        </p>
+      ) : (
+        <p className="text-zinc-500">
+          Tu certificado estará disponible aquí cuando se registre tu entrada en el congreso.
+        </p>
+      )}
     </div>
   );
 }

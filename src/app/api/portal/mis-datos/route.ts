@@ -45,6 +45,9 @@ export async function GET() {
     detalleLabel: string | null;
     detalleValor: string | null;
     generada: boolean;
+    // Solo Congreso: "disponible" con el check-in hecho, "pendiente" antes,
+    // "sin_nombre" si falta el nombre para imprimirlo. null en Gala/Excursión.
+    certificado: "disponible" | "pendiente" | "sin_nombre" | null;
   }[] = [];
   // Compras online (las que tienen referencia de pago de Stripe).
   const compras = new Map<string, CompraPortal>();
@@ -68,6 +71,14 @@ export async function GET() {
           detalleLabel: datos.detalleLabel,
           detalleValor: datos.detalleValor,
           generada: Boolean(fila.qr_codigo),
+          certificado:
+            tabla !== "congreso"
+              ? null
+              : fila.check_in_hecho !== "Sí"
+                ? "pendiente"
+                : typeof fila.nombre === "string" && fila.nombre.trim()
+                  ? "disponible"
+                  : "sin_nombre",
         });
 
         const referencia = fila.referencia_pago_online as string | null;

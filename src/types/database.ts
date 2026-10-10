@@ -40,6 +40,18 @@ export interface Edicion {
   incluye_diamante: string | null;
   incluye_oro: string | null;
   incluye_plata: string | null;
+
+  // Certificado de asistencia (las imágenes se gestionan aparte, ver
+  // /api/ediciones/certificado/imagen)
+  certificado_titulo: string | null;
+  certificado_lugar: string | null;
+  certificado_dias: string | null;
+  certificado_cabecera_linea1: string | null;
+  certificado_cabecera_linea2: string | null;
+  certificado_firmante: string | null;
+  certificado_cargo: string | null;
+  certificado_firma_ruta?: string | null;
+  certificado_imagen_ruta?: string | null;
 }
 
 export type EdicionInput = Omit<Edicion, "id">;

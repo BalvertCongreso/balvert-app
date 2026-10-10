@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import EdicionForm from "@/components/EdicionForm";
+import CertificadoEdicion from "@/components/CertificadoEdicion";
 import { borrarEdicion } from "@/lib/borrarEdicion";
 import type { Edicion, EdicionInput } from "@/types/database";
 
@@ -113,6 +114,8 @@ export default function EditarEdicionPage() {
           textoBoton="Guardar cambios"
         />
       )}
+
+      {!cargando && edicion && <CertificadoEdicion edicionId={edicion.id} />}
     </div>
   );
 }
