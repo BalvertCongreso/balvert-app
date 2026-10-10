@@ -55,6 +55,7 @@ export default function NuevoAsistenteGalaPage() {
       )}
 
       <InscripcionForm
+        historialEmail={edicion ? { tabla: "gala", edicionId: edicion.id, registroId: null } : undefined}
         secciones={seccionesGala}
         guardando={guardando}
         onGuardar={guardar}

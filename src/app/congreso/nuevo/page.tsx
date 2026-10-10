@@ -58,6 +58,7 @@ export default function NuevoAsistenteCongresoPage() {
       )}
 
       <InscripcionForm
+        historialEmail={edicion ? { tabla: "asistentes_congreso", edicionId: edicion.id, registroId: null } : undefined}
         secciones={seccionesCongreso}
         guardando={guardando}
         onGuardar={guardar}

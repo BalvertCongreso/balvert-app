@@ -104,6 +104,7 @@ export default function EditarAsistenteCongresoPage() {
             }
           />
           <InscripcionForm
+            historialEmail={{ tabla: "asistentes_congreso", edicionId: asistente.edicion_id, registroId: asistente.id }}
             secciones={seccionesCongreso}
             valoresPrevios={asistente as unknown as Record<string, string | number | null>}
             guardando={guardando}

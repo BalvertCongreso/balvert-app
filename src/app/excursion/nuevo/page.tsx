@@ -55,6 +55,7 @@ export default function NuevoAsistenteExcursionPage() {
       )}
 
       <InscripcionForm
+        historialEmail={edicion ? { tabla: "excursion", edicionId: edicion.id, registroId: null } : undefined}
         secciones={seccionesExcursion}
         guardando={guardando}
         onGuardar={guardar}

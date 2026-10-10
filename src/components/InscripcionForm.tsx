@@ -3,6 +3,10 @@
 import { useState } from "react";
 import type { SeccionDef } from "@/lib/patrocinadorFields";
 import BuscadorPatrocinador from "@/components/BuscadorPatrocinador";
+import AvisoEmailOtrasEdiciones, {
+  CAMPOS_EMAIL_HISTORIAL,
+  type TablaHistorial,
+} from "@/components/AvisoEmailOtrasEdiciones";
 
 function valoresIniciales(secciones: SeccionDef[]): Record<string, string> {
   const valores: Record<string, string> = {};
@@ -20,6 +24,8 @@ interface Props {
   guardando: boolean;
   onGuardar: (datos: Record<string, string | number | boolean | null>) => void;
   textoBoton: string;
+  // Si se indica, avisa cuando el email ya aparece en otras ediciones.
+  historialEmail?: { tabla: TablaHistorial; edicionId: string | null; registroId: string | null };
 }
 
 export default function InscripcionForm({
@@ -28,6 +34,7 @@ export default function InscripcionForm({
   guardando,
   onGuardar,
   textoBoton,
+  historialEmail,
 }: Props) {
   const camposNumericos = new Set(
     secciones.flatMap((s) => s.campos.filter((c) => c.tipo === "numero").map((c) => c.key))
@@ -154,6 +161,14 @@ export default function InscripcionForm({
                     step={campo.tipo === "numero" ? "0.01" : undefined}
                     value={valores[campo.key]}
                     onChange={(e) => actualizar(campo.key, e.target.value)}
+                  />
+                )}
+                {historialEmail && CAMPOS_EMAIL_HISTORIAL[historialEmail.tabla].includes(campo.key) && (
+                  <AvisoEmailOtrasEdiciones
+                    email={valores[campo.key]}
+                    edicionId={historialEmail.edicionId}
+                    tablaActual={historialEmail.tabla}
+                    registroId={historialEmail.registroId}
                   />
                 )}
                 {campo.nota && (

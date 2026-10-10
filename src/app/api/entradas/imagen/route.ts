@@ -25,6 +25,13 @@ export async function GET(req: Request) {
     .eq("id", id)
     .single();
 
+  // Token caducado o no válido: PostgREST responde con códigos PGRST3xx /
+  // mensajes "JWT …". Se distingue para que la pantalla pueda decir
+  // "vuelve a iniciar sesión" en vez de "no se ha generado".
+  if (error && (error.code?.startsWith("PGRST3") || /jwt/i.test(error.message))) {
+    return NextResponse.json({ error: "Sesión caducada." }, { status: 401 });
+  }
+
   if (error || !fila || !fila.qr_codigo) {
     return NextResponse.json({ error: "Esta entrada todavía no se ha generado." }, { status: 404 });
   }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { borrarEdicion } from "@/lib/borrarEdicion";
 import type { Edicion } from "@/types/database";
 
 export default function EdicionesPage() {
@@ -51,9 +52,9 @@ export default function EdicionesPage() {
     );
     if (!ok) return;
 
-    const { error } = await supabase.from("ediciones").delete().eq("id", id);
-    if (error) {
-      alert("No se pudo eliminar: " + error.message);
+    const mensaje = await borrarEdicion(id);
+    if (mensaje) {
+      alert(mensaje);
       return;
     }
     setEdiciones((prev) => prev.filter((e) => e.id !== id));

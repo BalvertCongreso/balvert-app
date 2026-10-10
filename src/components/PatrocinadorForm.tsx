@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { seccionesPatrocinador } from "@/lib/patrocinadorFields";
 import type { PatrocinadorInput } from "@/types/database";
+import AvisoEmailOtrasEdiciones, {
+  CAMPOS_EMAIL_HISTORIAL,
+  type TablaHistorial,
+} from "@/components/AvisoEmailOtrasEdiciones";
 
 const camposNumericos = new Set([
   "num_invitaciones_incluidas",
@@ -26,6 +30,8 @@ interface Props {
   guardando: boolean;
   onGuardar: (datos: PatrocinadorInput) => void;
   textoBoton: string;
+  // Si se indica, avisa cuando el email ya aparece en otras ediciones.
+  historialEmail?: { tabla: TablaHistorial; edicionId: string | null; registroId: string | null };
 }
 
 export default function PatrocinadorForm({
@@ -33,6 +39,7 @@ export default function PatrocinadorForm({
   guardando,
   onGuardar,
   textoBoton,
+  historialEmail,
 }: Props) {
   const [valores, setValores] = useState<Record<string, string>>(() => {
     const base = valoresIniciales();
@@ -118,6 +125,14 @@ export default function PatrocinadorForm({
                     step={campo.tipo === "numero" ? "0.01" : undefined}
                     value={valores[campo.key]}
                     onChange={(e) => actualizar(campo.key, e.target.value)}
+                  />
+                )}
+                {historialEmail && CAMPOS_EMAIL_HISTORIAL[historialEmail.tabla].includes(campo.key) && (
+                  <AvisoEmailOtrasEdiciones
+                    email={valores[campo.key]}
+                    edicionId={historialEmail.edicionId}
+                    tablaActual={historialEmail.tabla}
+                    registroId={historialEmail.registroId}
                   />
                 )}
                 {campo.nota && (

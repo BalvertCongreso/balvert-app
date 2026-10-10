@@ -56,7 +56,12 @@ export default function NuevoPatrocinadorPage() {
         </div>
       )}
 
-      <PatrocinadorForm guardando={guardando} onGuardar={guardar} textoBoton="Crear patrocinador" />
+      <PatrocinadorForm
+        historialEmail={edicion ? { tabla: "patrocinadores", edicionId: edicion.id, registroId: null } : undefined}
+        guardando={guardando}
+        onGuardar={guardar}
+        textoBoton="Crear patrocinador"
+      />
     </div>
   );
 }

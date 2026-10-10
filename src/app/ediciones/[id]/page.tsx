@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import EdicionForm from "@/components/EdicionForm";
+import { borrarEdicion } from "@/lib/borrarEdicion";
 import type { Edicion, EdicionInput } from "@/types/database";
 
 export default function EditarEdicionPage() {
@@ -63,9 +64,10 @@ export default function EditarEdicionPage() {
       `¿Eliminar la edición "${edicion?.nombre ?? "esta edición"}"? Esta acción no se puede deshacer.`
     );
     if (!ok) return;
-    const { error } = await supabase.from("ediciones").delete().eq("id", id);
-    if (error) {
-      setError(error.message);
+    const mensaje = await borrarEdicion(id);
+    if (mensaje) {
+      setError(mensaje);
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
     router.push("/ediciones");

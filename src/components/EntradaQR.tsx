@@ -21,6 +21,9 @@ async function cabeceraAutorizacion(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+const TIEMPO_MAXIMO_MS = 20000;
+const MOTIVO_SESION = "Tu sesión ha caducado. Vuelve a iniciar sesión (recarga la página) y pulsa «Reintentar».";
+
 export default function EntradaQR({
   tabla,
   registroId,
@@ -36,6 +39,12 @@ export default function EntradaQR({
   const [imagenBlobUrl, setImagenBlobUrl] = useState<string | null>(null);
   const [emailDestino, setEmailDestino] = useState("");
 
+  // Si la imagen no llega (sesión caducada, sin conexión, error del
+  // servidor…) se muestra el motivo y un botón "Reintentar"; nunca se queda
+  // en "Cargando…" indefinidamente.
+  const [errorImagen, setErrorImagen] = useState<string | null>(null);
+  const [intento, setIntento] = useState(0);
+
   // La imagen final (logo + datos + QR) la compone siempre el servidor
   // (misma imagen que se adjunta en el email); aquí solo la mostramos. Se
   // pide por fetch (no <img src> directo) para poder mandar la sesión en la
@@ -48,23 +57,54 @@ export default function EntradaQR({
     }
     let cancelado = false;
     let urlCreada: string | null = null;
+    const controlador = new AbortController();
+    let porTiempo = false;
+    const temporizador = setTimeout(() => {
+      porTiempo = true;
+      controlador.abort();
+    }, TIEMPO_MAXIMO_MS);
 
     (async () => {
-      const headers = await cabeceraAutorizacion();
-      const res = await fetch(`/api/entradas/imagen?tabla=${tabla}&id=${registroId}&v=${qrCodigo}`, {
-        headers,
-      });
-      if (!res.ok || cancelado) return;
-      const blob = await res.blob();
-      urlCreada = URL.createObjectURL(blob);
-      if (!cancelado) setImagenBlobUrl(urlCreada);
+      try {
+        const headers = await cabeceraAutorizacion();
+        if (!headers.Authorization) throw new Error(MOTIVO_SESION);
+        const res = await fetch(`/api/entradas/imagen?tabla=${tabla}&id=${registroId}&v=${qrCodigo}`, {
+          headers,
+          signal: controlador.signal,
+        });
+        if (!res.ok) {
+          if (res.status === 401) throw new Error(MOTIVO_SESION);
+          if (res.status === 404) throw new Error("El servidor no encuentra esta entrada. Recarga la página por si se ha borrado o cambiado.");
+          throw new Error("El servidor ha tenido un problema al preparar la imagen. Prueba de nuevo en un momento.");
+        }
+        const blob = await res.blob();
+        if (cancelado) return;
+        urlCreada = URL.createObjectURL(blob);
+        setErrorImagen(null);
+        setImagenBlobUrl(urlCreada);
+      } catch (e) {
+        if (cancelado) return;
+        setImagenBlobUrl(null);
+        if (porTiempo) {
+          setErrorImagen("El servidor está tardando demasiado en responder. Comprueba tu conexión y prueba de nuevo.");
+        } else if (e instanceof TypeError) {
+          // fetch lanza TypeError cuando no hay conexión
+          setErrorImagen("No hay conexión a internet o se ha cortado. Comprueba la conexión y prueba de nuevo.");
+        } else {
+          setErrorImagen(e instanceof Error ? e.message : "Error inesperado.");
+        }
+      } finally {
+        clearTimeout(temporizador);
+      }
     })();
 
     return () => {
       cancelado = true;
+      clearTimeout(temporizador);
+      controlador.abort();
       if (urlCreada) URL.revokeObjectURL(urlCreada);
     };
-  }, [tabla, registroId, qrCodigo]);
+  }, [tabla, registroId, qrCodigo, intento]);
 
   async function generarYEnviar() {
     setEnviando(true);
@@ -162,6 +202,21 @@ export default function EntradaQR({
               </div>
             )}
           </div>
+        </div>
+      ) : qrCodigo && errorImagen ? (
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <p className="font-semibold">No se pudo cargar la entrada</p>
+          <p className="mt-1">{errorImagen}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setErrorImagen(null);
+              setIntento((n) => n + 1);
+            }}
+            className="mt-3 rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-100"
+          >
+            Reintentar
+          </button>
         </div>
       ) : qrCodigo ? (
         <p className="text-sm text-zinc-500">Cargando entrada…</p>

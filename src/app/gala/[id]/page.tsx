@@ -101,6 +101,7 @@ export default function EditarAsistenteGalaPage() {
             }
           />
           <InscripcionForm
+            historialEmail={{ tabla: "gala", edicionId: asistente.edicion_id, registroId: asistente.id }}
             secciones={seccionesGala}
             valoresPrevios={asistente as unknown as Record<string, string | number | null>}
             guardando={guardando}

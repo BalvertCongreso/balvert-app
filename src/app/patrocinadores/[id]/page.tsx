@@ -98,6 +98,7 @@ export default function EditarPatrocinadorPage() {
             numInvitacionesIncluidas={patrocinador.num_invitaciones_incluidas}
           />
           <PatrocinadorForm
+            historialEmail={{ tabla: "patrocinadores", edicionId: patrocinador.edicion_id, registroId: patrocinador.id }}
             valoresPrevios={patrocinador as unknown as Record<string, string | number | null>}
             guardando={guardando}
             onGuardar={guardar}
