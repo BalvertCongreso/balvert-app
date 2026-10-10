@@ -2,14 +2,16 @@ import { NextResponse } from "next/server";
 import { usuarioDesdeCabecera } from "@/lib/supabaseServidor";
 import { enviarCampanaATodos } from "@/lib/mailrelay";
 import { enviarAvisoNewsletter } from "@/lib/newsletterAvisoEmail";
+import { ORIGEN_PUBLICO } from "@/lib/dominio";
 
 // Solo se incluye callback_url si hay un secreto configurado, para que
 // Mailrelay no pueda disparar el aviso de cualquiera que adivine la ruta.
-function construirCallbackUrl(req: Request): string | undefined {
+// Siempre con el dominio público, nunca con el que mande el navegador: la
+// URL lleva el secreto y no debe registrarse apuntando a otro sitio.
+function construirCallbackUrl(): string | undefined {
   const secreto = process.env.MAILRELAY_CALLBACK_SECRET;
   if (!secreto) return undefined;
-  const origin = req.headers.get("origin") || new URL(req.url).origin;
-  return `${origin}/api/newsletter/mailrelay-callback?secret=${encodeURIComponent(secreto)}`;
+  return `${ORIGEN_PUBLICO}/api/newsletter/mailrelay-callback?secret=${encodeURIComponent(secreto)}`;
 }
 
 // Envía la campaña a TODO el grupo (destinatarios reales). Solo debe
@@ -36,7 +38,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   try {
     await enviarCampanaATodos(Number(id), {
       scheduledAtUtc,
-      callbackUrl: scheduledAtUtc ? construirCallbackUrl(req) : undefined,
+      callbackUrl: scheduledAtUtc ? construirCallbackUrl() : undefined,
     });
 
     if (!scheduledAtUtc) {
