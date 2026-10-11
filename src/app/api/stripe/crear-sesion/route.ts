@@ -218,7 +218,7 @@ export async function POST(req: Request) {
       price_data: {
         currency: "eur",
         unit_amount: Math.round(precio * 100),
-        product_data: { name: `${nombre} ${sufijo}` },
+        product_data: { name: `${nombre} ${sufijo}`, description: "IVA incluido" },
       },
       quantity: cantidad,
     });
@@ -276,6 +276,10 @@ export async function POST(req: Request) {
   try {
     session = await stripe.checkout.sessions.create({
       mode: "payment",
+      // Solo tarjeta (Apple Pay y Google Pay entran como tarjeta): el webhook
+      // solo crea entradas con payment_status = "paid", y un método de cobro
+      // diferido dejaría al comprador sin entrada.
+      payment_method_types: ["card"],
       customer_email: compradorEmail,
       line_items: lineItems,
       client_reference_id: compra.id,

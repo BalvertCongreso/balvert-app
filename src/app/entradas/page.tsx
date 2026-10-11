@@ -110,6 +110,7 @@ function SeccionTipo({
         <p className="text-sm text-zinc-500">
           {euros(precio)} / persona
           {precioColegiado !== null && ` · ${euros(precioColegiado)} colegiados`}
+          {" · IVA incluido"}
         </p>
       </div>
 
@@ -204,7 +205,7 @@ function SeccionTipo({
                     checked={persona.colegiado}
                     onChange={(e) => actualizar(i, { colegiado: e.target.checked })}
                   />
-                  Soy colegiado ({euros(precioColegiado)})
+                  Soy colegiado ({euros(precioColegiado)}, IVA incluido)
                 </label>
                 {persona.colegiado && (
                   <div className="grid gap-2 sm:grid-cols-2">
@@ -473,7 +474,9 @@ export default function EntradasPage() {
             {total !== null && total !== undefined && total > 0 && (
               <div className="flex items-baseline justify-between border-t border-[var(--borde)] pt-4">
                 <p className="text-sm font-semibold text-zinc-700">Total a pagar</p>
-                <p className="text-lg font-bold text-[var(--balvert-marron)]">{euros(total)}</p>
+                <p className="text-lg font-bold text-[var(--balvert-marron)]">
+                  {euros(total)} <span className="text-sm font-normal text-zinc-500">IVA incluido</span>
+                </p>
               </div>
             )}
 
