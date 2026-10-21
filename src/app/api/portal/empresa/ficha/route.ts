@@ -3,7 +3,7 @@ import { Resend } from "resend";
 import { crearClienteServicio } from "@/lib/supabaseServidor";
 import { EMAIL_REGEX } from "@/lib/portal";
 import { ORIGEN_PUBLICO } from "@/lib/dominio";
-import { autorEmpresa, claveAcciones, sesionEmpresa } from "@/lib/portalEmpresa";
+import { autorEmpresa, avisaASecretaria, claveAcciones, sesionEmpresa } from "@/lib/portalEmpresa";
 import { actualizarFichaComo } from "@/lib/patrocinadorArchivos";
 import { CAMPOS_EMPRESA, CAMPOS_FACTURACION_EMPRESA } from "@/lib/datosEmpresa";
 import { LIMITE_CAMBIOS_POR_HORA, MENSAJE_LIMITE, accionesUltimaHora, registrarAccion } from "@/lib/portalMateriales";
@@ -75,7 +75,8 @@ export async function POST(req: Request) {
   }
 
   const deFacturacion = CAMPOS_FACTURACION_EMPRESA.filter((c) => c.clave in cambios);
-  if (deFacturacion.length > 0) {
+  // Hecho por la organización («Ver como la empresa»): sin aviso.
+  if (deFacturacion.length > 0 && avisaASecretaria(sesion)) {
     await avisarCambioFacturacion(
       ficha.empresa_entidad?.trim() || "Empresa sin nombre",
       sesion.patrocinadorId,

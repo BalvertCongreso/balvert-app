@@ -1,7 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { crearClienteServicio } from "@/lib/supabaseServidor";
 import { EMAIL_REGEX } from "@/lib/portal";
-import { autorEmpresa, claveAcciones, sesionEmpresa } from "@/lib/portalEmpresa";
+import { autorEmpresa, claveAcciones, avisaASecretaria, sesionEmpresa } from "@/lib/portalEmpresa";
 import { actualizarFichaComo } from "@/lib/patrocinadorArchivos";
 import { PONENCIA_POR_CATEGORIA } from "@/lib/datosEmpresa";
 import {
@@ -123,6 +123,8 @@ export async function POST(req: Request) {
       : []),
   ];
   const titulo = tendra ? `Revisar datos del ponente de ${empresa}` : `${empresa} no hará ponencia`;
+  // Hecho por la organización («Ver como la empresa»): sin tarea ni aviso.
+  if (!avisaASecretaria(sesion)) return NextResponse.json({ ok: true });
   try {
     await crearTareaRevision(
       supabase,

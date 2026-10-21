@@ -39,6 +39,8 @@ export async function GET() {
       categoria: ficha.categoria,
       edicionNombre: edicion?.nombre ?? null,
       deEstaEdicion: !!edicionId && ficha.edicion_id === edicionId,
+      modoOrganizacion: sesion.modoOrganizacion,
+      organizador: sesion.organizador,
       documentos,
     },
     { headers: { "Cache-Control": "no-store" } }

@@ -106,6 +106,29 @@ export default function EntradaQR({
     };
   }, [tabla, registroId, qrCodigo, intento]);
 
+  // Solo genera el QR, sin email: luego se descarga o se envía desde aquí.
+  async function generarSinEnviar() {
+    setEnviando(true);
+    setError(null);
+    setMensaje(null);
+    try {
+      const headers = await cabeceraAutorizacion();
+      const res = await fetch("/api/entradas/generar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ tabla, id: registroId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "No se pudo generar la entrada.");
+      if (data.qr_codigo) onActualizado({ qr_codigo: data.qr_codigo, entrada_enviada: entradaEnviada === "Sí" ? "Sí" : "No" });
+      setMensaje("Entrada generada, sin enviar. Puedes descargarla o enviarla por email.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error inesperado.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
   async function generarYEnviar() {
     setEnviando(true);
     setError(null);
@@ -197,7 +220,7 @@ export default function EntradaQR({
                   disabled={enviando}
                   className="self-start text-sm font-medium text-[var(--balvert-azul-oscuro)] hover:underline disabled:opacity-60"
                 >
-                  {enviando ? "Reenviando…" : "Reenviar entrada por email"}
+                  {enviando ? "Enviando…" : entradaEnviada === "Sí" ? "Reenviar entrada por email" : "Enviar entrada por email"}
                 </button>
               </div>
             )}
@@ -226,19 +249,32 @@ export default function EntradaQR({
             Todavía no se ha generado la entrada para{" "}
             {email ? "este asistente" : "este asistente (sin email guardado, solo se generará el QR)"}.
           </p>
-          <button
-            type="button"
-            onClick={generarYEnviar}
-            disabled={enviando}
-            className="rounded-md px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-            style={{ background: "var(--balvert-azul-oscuro)" }}
-          >
-            {enviando
-              ? "Generando…"
-              : email
-              ? "Generar entrada QR y enviar por email"
-              : "Generar entrada QR"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {email && (
+              <button
+                type="button"
+                onClick={generarYEnviar}
+                disabled={enviando}
+                className="rounded-md px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                style={{ background: "var(--balvert-azul-oscuro)" }}
+              >
+                {enviando ? "Generando…" : "Generar entrada QR y enviar por email"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={generarSinEnviar}
+              disabled={enviando}
+              className={
+                email
+                  ? "rounded-md border border-[var(--borde)] px-4 py-2 text-sm font-semibold text-[var(--balvert-azul-oscuro)] hover:bg-zinc-50 disabled:opacity-60"
+                  : "rounded-md px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              }
+              style={email ? undefined : { background: "var(--balvert-azul-oscuro)" }}
+            >
+              {enviando ? "Generando…" : "Generar entrada QR (sin enviar)"}
+            </button>
+          </div>
         </div>
       )}
     </section>

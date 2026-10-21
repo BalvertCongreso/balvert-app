@@ -1,6 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { crearClienteServicio } from "@/lib/supabaseServidor";
-import { autorEmpresa, claveAcciones, sesionEmpresa } from "@/lib/portalEmpresa";
+import { autorEmpresa, claveAcciones, avisaASecretaria, sesionEmpresa } from "@/lib/portalEmpresa";
 import { actualizarFichaComo } from "@/lib/patrocinadorArchivos";
 import {
   LIMITE_CAMBIOS_POR_HORA,
@@ -91,6 +91,8 @@ export async function POST(req: Request) {
 
   const empresa = nombreEmpresa(ficha);
   const detalle = [`Empresa: ${empresa}`, `Pedido por: ${autorEmpresa(sesion)}`, ...lineas];
+  // Hecho por la organización («Ver como la empresa»): sin tarea ni aviso.
+  if (!avisaASecretaria(sesion)) return NextResponse.json({ ok: true });
   try {
     await crearTareaRevision(
       supabase,

@@ -373,6 +373,62 @@ function ponenteCompleto(p: Ponente | null) {
   );
 }
 
+// La ponencia tiene su propia pestaña (SeccionPonencia): Material se queda
+// con el logo y los diseños de rollup y vinilado.
+const TIPOS_MATERIAL: readonly TipoArchivoPortal[] = ["logo", "rollup", "vinilado"];
+const TIPOS_PONENCIA: readonly TipoArchivoPortal[] = ["ponencia"];
+
+// Quién ve la pestaña «Ponencia»: Diamante y Oro (la deciden ellos) y quien
+// tenga la ponencia activada en la ficha (p. ej. una Plata).
+export function tienePestanaPonencia(e: EmpresaMaterial) {
+  return e.ponencia.decideEmpresa || e.estado.tienePonencia;
+}
+
+// ---- Pestaña "Ponencia" ----
+
+export function SeccionPonencia({ e, recargar }: { e: EmpresaMaterial; recargar: () => void }) {
+  const conPonencia = e.estado.tienePonencia;
+  return (
+    <div className="flex flex-col gap-4">
+      {e.estado.fechaLimite && conPonencia && <FechaLimite iso={e.estado.fechaLimite} />}
+      {(conPonencia || (e.ponencia.decideEmpresa && !e.ponencia.respuesta)) && (
+        <Bloque titulo="Tu ponencia de un vistazo">
+          <ul className="flex flex-col gap-2 text-sm text-zinc-700">
+            {e.ponencia.decideEmpresa && !e.ponencia.respuesta && (
+              <li className="flex items-center justify-between gap-3">
+                ¿Vais a hacer ponencia? <Etiqueta bien={false}>Falta responder</Etiqueta>
+              </li>
+            )}
+            {conPonencia && (
+              <>
+                <li className="flex items-center justify-between gap-3">
+                  Presentación{" "}
+                  <Etiqueta bien={e.estado.ponenciaRecibida}>{e.estado.ponenciaRecibida ? "Recibida" : "Pendiente"}</Etiqueta>
+                </li>
+                <li className="flex items-center justify-between gap-3">
+                  Datos del ponente{" "}
+                  <Etiqueta bien={ponenteCompleto(e.ponente)}>{ponenteCompleto(e.ponente) ? "Completos" : "Faltan datos"}</Etiqueta>
+                </li>
+              </>
+            )}
+          </ul>
+        </Bloque>
+      )}
+      {e.ponencia.decideEmpresa ? (
+        <PonenciaEmpresa key={e.id} e={e} onGuardado={recargar} />
+      ) : (
+        e.ponente && <DatosPonente e={e} ponente={e.ponente} onGuardado={recargar} />
+      )}
+      {conPonencia && (
+        <>
+          <Subir e={e} onSubido={recargar} tipos={TIPOS_PONENCIA} />
+          <Subidos e={e} onBorrado={recargar} tipos={TIPOS_PONENCIA} />
+        </>
+      )}
+    </div>
+  );
+}
+
 export function SeccionMaterial({
   e,
   recargar,
@@ -392,23 +448,6 @@ export function SeccionMaterial({
           <li className="flex items-center justify-between gap-3">
             Logo <Etiqueta bien={e.estado.logoRecibido}>{e.estado.logoRecibido ? "Recibido" : "Pendiente"}</Etiqueta>
           </li>
-          {e.ponencia.decideEmpresa && !e.ponencia.respuesta && (
-            <li className="flex items-center justify-between gap-3">
-              ¿Vais a hacer ponencia? <Etiqueta bien={false}>Falta responder</Etiqueta>
-            </li>
-          )}
-          {e.estado.tienePonencia && (
-            <>
-              <li className="flex items-center justify-between gap-3">
-                Ponencia{" "}
-                <Etiqueta bien={e.estado.ponenciaRecibida}>{e.estado.ponenciaRecibida ? "Recibida" : "Pendiente"}</Etiqueta>
-              </li>
-              <li className="flex items-center justify-between gap-3">
-                Datos del ponente{" "}
-                <Etiqueta bien={ponenteCompleto(e.ponente)}>{ponenteCompleto(e.ponente) ? "Completos" : "Faltan datos"}</Etiqueta>
-              </li>
-            </>
-          )}
           {p.precioRollup && (
             <li className="flex items-center justify-between gap-3">
               Rollups pedidos <Etiqueta bien={p.rollupsSolicitados > 0}>{p.rollupsSolicitados}</Etiqueta>
@@ -431,13 +470,8 @@ export function SeccionMaterial({
         )}
       </Bloque>
 
-      <Subir e={e} onSubido={recargar} />
-      <Subidos e={e} onBorrado={recargar} />
-      {e.ponencia.decideEmpresa ? (
-        <PonenciaEmpresa key={e.id} e={e} onGuardado={recargar} />
-      ) : (
-        e.ponente && <DatosPonente e={e} ponente={e.ponente} onGuardado={recargar} />
-      )}
+      <Subir e={e} onSubido={recargar} tipos={TIPOS_MATERIAL} />
+      <Subidos e={e} onBorrado={recargar} tipos={TIPOS_MATERIAL} />
     </div>
   );
 }
@@ -489,8 +523,16 @@ function Paso({ n, titulo, children }: { n: number; titulo: string; children: Re
   );
 }
 
-function Subir({ e, onSubido }: { e: EmpresaMaterial; onSubido: () => void }) {
-  const [tipo, setTipo] = useState<TipoArchivoPortal>("logo");
+function Subir({
+  e,
+  onSubido,
+  tipos = TIPOS_ARCHIVO_PORTAL,
+}: {
+  e: EmpresaMaterial;
+  onSubido: () => void;
+  tipos?: readonly TipoArchivoPortal[];
+}) {
+  const [tipo, setTipo] = useState<TipoArchivoPortal>(tipos[0]);
   const [archivo, setArchivo] = useState<File | null>(null);
   const [comentario, setComentario] = useState("");
   const [progreso, setProgreso] = useState<number | null>(null);
@@ -546,7 +588,10 @@ function Subir({ e, onSubido }: { e: EmpresaMaterial; onSubido: () => void }) {
   const subiendo = progreso !== null;
 
   return (
-    <Bloque titulo="Enviarnos un archivo" ayuda="Sigue estos pasos. Puedes enviar varios archivos, uno detrás de otro.">
+    <Bloque
+      titulo={tipos.length === 1 && tipos[0] === "ponencia" ? "Enviarnos la presentación" : "Enviarnos un archivo"}
+      ayuda="Sigue estos pasos. Puedes enviar varios archivos, uno detrás de otro."
+    >
       <form onSubmit={subir} className="flex flex-col gap-5">
         <Paso n={1} titulo="Elige qué nos envías">
           <select
@@ -556,7 +601,7 @@ function Subir({ e, onSubido }: { e: EmpresaMaterial; onSubido: () => void }) {
             disabled={subiendo}
             onChange={(ev) => setTipo(ev.target.value as TipoArchivoPortal)}
           >
-            {TIPOS_ARCHIVO_PORTAL.map((t) => (
+            {tipos.map((t) => (
               <option key={t} value={t}>
                 {TEXTO_TIPO[t].opcion}
               </option>
@@ -623,7 +668,16 @@ function Subir({ e, onSubido }: { e: EmpresaMaterial; onSubido: () => void }) {
   );
 }
 
-function Subidos({ e, onBorrado }: { e: EmpresaMaterial; onBorrado: () => void }) {
+function Subidos({
+  e,
+  onBorrado,
+  tipos,
+}: {
+  e: EmpresaMaterial;
+  onBorrado: () => void;
+  tipos: readonly TipoArchivoPortal[];
+}) {
+  const subidos = e.subidos.filter((a) => (tipos as readonly string[]).includes(a.tipo));
   const [error, setError] = useState<string | null>(null);
   const [borrando, setBorrando] = useState<string | null>(null);
 
@@ -651,11 +705,13 @@ function Subidos({ e, onBorrado }: { e: EmpresaMaterial; onBorrado: () => void }
           <Aviso tipo="error">{error}</Aviso>
         </div>
       )}
-      {e.subidos.length === 0 ? (
-        <p className="rounded-md bg-zinc-50 p-3 text-sm text-zinc-600">Todavía no nos has enviado nada. Empieza por el logo.</p>
+      {subidos.length === 0 ? (
+        <p className="rounded-md bg-zinc-50 p-3 text-sm text-zinc-600">
+          {tipos.includes("ponencia") ? "Todavía no nos has enviado la presentación." : "Todavía no nos has enviado nada. Empieza por el logo."}
+        </p>
       ) : (
         <ul className="flex flex-col divide-y divide-[var(--borde)]">
-          {e.subidos.map((a) => (
+          {subidos.map((a) => (
             <li key={a.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 text-sm">
                 <p className="break-words font-medium text-zinc-800">
@@ -844,7 +900,7 @@ function DatosPonente({
           "number"
         )}
         <p className="self-end text-xs text-zinc-500 sm:pb-6">
-          La presentación se sube arriba, en «Enviarnos un archivo» → «Ponencia (presentación)».
+          La presentación se sube más abajo, en «Enviarnos la presentación».
         </p>
         <div className="flex flex-col gap-3 sm:col-span-2">
           {error && <Aviso tipo="error">{error}</Aviso>}

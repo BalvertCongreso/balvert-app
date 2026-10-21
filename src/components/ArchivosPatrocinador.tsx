@@ -54,19 +54,26 @@ export default function ArchivosPatrocinador({
   onCambiosFicha,
   onRevisado,
   solo,
+  tipos,
 }: {
   patrocinadorId: string;
   // Zona de patrocinadores: "empresa" = solo lo que ha subido la empresa (sin
   // formulario de subida); "equipo" = documentos para la empresa, con el
   // botón «Subir documento» (se le asigna sola). Sin indicar: todo, como en la ficha.
   solo?: "empresa" | "equipo";
+  // Solo estos tipos (p. ej. la pestaña Ponencia de la Zona de patrocinadores).
+  tipos?: readonly TipoArchivo[];
   // Al marcar como revisado algo que subió la empresa (Zona de patrocinadores).
   onRevisado?: () => void;
   // Al borrar el último logo/ponencia la ficha cambia ("Logo recibido" → No).
   onCambiosFicha?: (cambios: Record<string, string>) => void;
 }) {
   const [todos, setArchivos] = useState<Archivo[] | null>(null);
-  const archivos = todos && solo ? todos.filter((a) => a.origen === (solo === "empresa" ? "patrocinador" : "equipo")) : todos;
+  const archivos =
+    todos?.filter(
+      (a) =>
+        (!solo || a.origen === (solo === "empresa" ? "patrocinador" : "equipo")) && (!tipos || tipos.includes(a.tipo))
+    ) ?? null;
   const [error, setError] = useState<string | null>(null);
   const [tipo, setTipo] = useState<TipoArchivo>(solo === "equipo" ? "factura" : "logo");
   const [titulo, setTitulo] = useState("");

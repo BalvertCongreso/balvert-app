@@ -182,13 +182,15 @@ export function validarNuevoInvitado(body: unknown): DatosNuevoInvitado | string
 export interface ResultadoAlta {
   clave: string;
   // Solo si se pidió enviar: si el email salió o no (las entradas quedan
-  // generadas igualmente y se reenvían desde su ficha).
+  // generadas igualmente y se envían o reenvían desde su ficha).
   enviado: boolean | null;
   errorEnvio?: string;
 }
 
-// Crea las filas del invitado (Congreso y, si se piden, cena y excursión) y,
-// si enviar es true, genera sus entradas y se las manda en un solo email.
+// Crea las filas del invitado (Congreso y, si se piden, cena y excursión) con
+// sus entradas ya generadas (QR) y, si enviar es true, se las manda en un solo
+// email; si no, quedan generadas y «no enviadas» (se descargan o se envían
+// después desde la ficha).
 // limitar: no deja pasar de lo incluido (la empresa desde su zona); el panel
 // sí puede (con aviso en pantalla).
 export async function anadirInvitado(
@@ -213,7 +215,7 @@ export async function anadirInvitado(
     if (datos.excursion && asignadas.excursion >= incluidas.excursion) throw new ErrorInvitados(MENSAJE_LIMITE);
   }
 
-  const qr = () => (opciones.enviar ? randomUUID() : null);
+  const qr = () => randomUUID();
   const comunes = {
     edicion_id: patrocinador.edicion_id,
     empresa_entidad: patrocinador.id,

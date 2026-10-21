@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import PortalMarco from "@/components/PortalMarco";
+import ComprarEntradas from "@/components/ComprarEntradas";
 import { Aviso } from "./MaterialPatrocinador";
 import { CAMPOS_FACTURACION, type DatosFacturacion } from "@/lib/factura";
 import {
@@ -560,6 +561,7 @@ function AreaCliente() {
       accion={botonSalir}
     >
       <p className="mb-4 break-words text-sm text-zinc-500">Has entrado como {datos.email}</p>
+      <ComprarEntradas />
 
       {visibles.length > 1 && (
         <nav

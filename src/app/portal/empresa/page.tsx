@@ -3,11 +3,14 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import PortalMarco from "@/components/PortalMarco";
+import ComprarEntradas from "@/components/ComprarEntradas";
 import {
   Aviso,
   DocumentosOrganizacion,
   SeccionMaterial,
   SeccionPatrocinio,
+  SeccionPonencia,
+  tienePestanaPonencia,
   obtenerMateriales,
   type EmpresaMaterial,
 } from "../inicio/MaterialPatrocinador";
@@ -24,10 +27,13 @@ interface DatosEmpresa {
   categoria: string | null;
   edicionNombre: string | null;
   deEstaEdicion: boolean;
+  // «Ver como la empresa» desde el panel (sesión de la organización).
+  modoOrganizacion: boolean;
+  organizador: string | null;
   documentos: { id: string; titulo: string; descripcion: string | null; nombre_archivo: string }[];
 }
 
-type Pestana = "patrocinio" | "invitaciones" | "material" | "documentos" | "datos" | "acceso";
+type Pestana = "patrocinio" | "invitaciones" | "ponencia" | "material" | "documentos" | "datos" | "acceso";
 
 const PESTANAS: { id: Pestana; titulo: string; intro: string }[] = [
   {
@@ -43,10 +49,16 @@ const PESTANAS: { id: Pestana; titulo: string; intro: string }[] = [
       "Aquí tenéis a todos vuestros invitados. Podéis añadir a los que faltan (les enviamos su entrada al momento), descargar sus entradas para repartirlas y quitar o cambiar invitados.",
   },
   {
+    id: "ponencia",
+    titulo: "Ponencia",
+    intro:
+      "Aquí nos decís si vais a hacer ponencia, los datos del ponente y nos enviáis la presentación. Cuando la subáis, nos llega un aviso y la revisamos.",
+  },
+  {
     id: "material",
     titulo: "Material",
     intro:
-      "Aquí puedes enviarnos el logo, la ponencia y los diseños de rollup y vinilado. Cuando subas algo, nos llega un aviso y lo revisamos.",
+      "Aquí puedes enviarnos el logo y los diseños de rollup y vinilado. Cuando subas algo, nos llega un aviso y lo revisamos.",
   },
   {
     id: "documentos",
@@ -122,6 +134,15 @@ function ZonaEmpresa() {
     router.replace("/portal");
   }
 
+  // «Ver como la empresa»: cierra la sesión de la organización y la pestaña
+  // (se abrió desde el panel); si el navegador no deja cerrarla, va a /portal.
+  async function salirOrganizacion() {
+    setSaliendo(true);
+    await fetch("/api/portal/empresa/salir", { method: "POST" }).catch(() => null);
+    window.close();
+    router.replace("/portal");
+  }
+
   const botonSalir = (
     <button
       type="button"
@@ -150,11 +171,40 @@ function ZonaEmpresa() {
   }
 
   const pedida = searchParams.get("pestana") as Pestana | null;
-  const pestana: Pestana = pedida && PESTANAS.some((p) => p.id === pedida) ? pedida : "patrocinio";
+  // «Ponencia» solo para quien la tiene; «Cambiar contraseña» no en modo organización.
+  const visibles = PESTANAS.filter(
+    (p) =>
+      (p.id !== "ponencia" || (empresa && tienePestanaPonencia(empresa))) && (p.id !== "acceso" || !datos.modoOrganizacion)
+  );
+  const pestana: Pestana = pedida && visibles.some((p) => p.id === pedida) ? pedida : "patrocinio";
   const info = PESTANAS.find((p) => p.id === pestana)!;
   const irA = (p: Pestana) => router.replace(`/portal/empresa?pestana=${p}`, { scroll: false });
 
   return (
+    <>
+    {datos.modoOrganizacion && (
+      <>
+        <div
+          role="status"
+          className="fixed inset-x-0 top-0 z-50 flex flex-wrap items-center justify-center gap-3 bg-amber-100 px-4 py-2 text-center text-sm text-amber-900 shadow"
+        >
+          <span>
+            Estás viendo la zona de <strong>{datos.empresa ?? "la empresa"}</strong> como organización. Lo que cambies quedará
+            a tu nombre.
+          </span>
+          <button
+            type="button"
+            onClick={salirOrganizacion}
+            disabled={saliendo}
+            className="min-h-9 rounded-md border border-amber-400 bg-white px-3 py-1 font-semibold hover:bg-amber-50 disabled:opacity-60"
+          >
+            Salir
+          </button>
+        </div>
+        {/* Hueco para que la franja no tape la cabecera. */}
+        <div className="h-16 sm:h-12" />
+      </>
+    )}
     <PortalMarco
       subtitulo={`Zona de patrocinadores${datos.edicionNombre ? ` — ${datos.edicionNombre}` : ""}`}
       ancho="max-w-3xl"
@@ -165,12 +215,13 @@ function ZonaEmpresa() {
         {datos.categoria && <p className="text-zinc-600">Patrocinio: {datos.categoria}</p>}
         <p className="text-xs text-zinc-500">Usuario: {datos.usuario}</p>
       </div>
+      <ComprarEntradas />
 
       <nav
         aria-label="Secciones de la zona de empresa"
         className="-mx-6 mb-5 flex gap-1 overflow-x-auto border-b border-[var(--borde)] px-6 sm:-mx-8 sm:px-8"
       >
-        {PESTANAS.map(({ id, titulo }) => {
+        {visibles.map(({ id, titulo }) => {
           const activa = id === pestana;
           return (
             <button
@@ -194,7 +245,7 @@ function ZonaEmpresa() {
       <h2 className="mb-1 text-lg font-semibold text-zinc-800">{info.titulo}</h2>
       <p className="mb-5 text-sm text-zinc-600">{info.intro}</p>
 
-      {(pestana === "patrocinio" || pestana === "material") && (
+      {(pestana === "patrocinio" || pestana === "material" || pestana === "ponencia") && (
         <>
           {errorEmpresa && <Aviso tipo="error">{errorEmpresa}</Aviso>}
           {empresa === undefined && !errorEmpresa && <p className="text-sm text-zinc-500">Cargando…</p>}
@@ -204,6 +255,7 @@ function ZonaEmpresa() {
             </Aviso>
           )}
           {empresa && pestana === "patrocinio" && <SeccionPatrocinio e={empresa} recargar={recargar} />}
+          {empresa && pestana === "ponencia" && <SeccionPonencia e={empresa} recargar={recargar} />}
           {empresa && pestana === "material" && (
             <SeccionMaterial e={empresa} recargar={recargar} irAPatrocinio={() => irA("patrocinio")} />
           )}
@@ -249,6 +301,7 @@ function ZonaEmpresa() {
 
       <Contacto />
     </PortalMarco>
+    </>
   );
 }
 

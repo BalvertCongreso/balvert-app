@@ -20,6 +20,11 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
   const sesion = await sesionEmpresa();
   if (!sesion) return NextResponse.json({ error: "Tu sesión ha caducado. Vuelve a entrar." }, { status: 401 });
+  // «Ver como la empresa»: la organización no cambia la contraseña de la empresa
+  // (para eso está «Generar contraseña nueva» en el panel).
+  if (sesion.modoOrganizacion) {
+    return NextResponse.json({ error: "Desde «Ver como la empresa» no se puede cambiar la contraseña." }, { status: 403 });
+  }
   const body = await req.json().catch(() => null);
   const actual = typeof body?.actual === "string" ? body.actual : "";
   const nueva = typeof body?.nueva === "string" ? body.nueva : "";

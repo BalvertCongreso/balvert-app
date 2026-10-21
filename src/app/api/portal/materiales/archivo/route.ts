@@ -1,6 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { crearClienteServicio } from "@/lib/supabaseServidor";
-import { autorEmpresa, claveAcciones, sesionEmpresa } from "@/lib/portalEmpresa";
+import { autorEmpresa, claveAcciones, avisaASecretaria, sesionEmpresa } from "@/lib/portalEmpresa";
 import {
   BUCKET_ARCHIVOS_PATROCINADOR,
   CASILLA_POR_TIPO,
@@ -101,6 +101,8 @@ export async function POST(req: Request) {
     `Archivo: ${partes[2]}`,
     `Comentario: ${comentario || "—"}`,
   ];
+  // Hecho por la organización («Ver como la empresa»): sin tarea ni aviso.
+  if (!avisaASecretaria(sesion)) return NextResponse.json({ ok: true });
   try {
     await crearTareaRevision(
       supabase,

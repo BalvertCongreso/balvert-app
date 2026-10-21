@@ -30,6 +30,7 @@ const ETIQUETAS_EXTRA: Record<string, string> = {
   check_in_hecho: "Check-in hecho",
   check_in_fecha: "Fecha y hora del check-in",
   recibo_url: "Recibo de pago (enlace)",
+  entrada_generada: "Entrada generada (QR)",
   nombres_invitados: "Nombres de los invitados (antiguo)",
   emails_invitados: "Emails de los invitados (antiguo)",
 };

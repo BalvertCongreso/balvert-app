@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { cabeceraAutorizacion, llamarApiGet, llamarApiJson } from "@/lib/apiCliente";
+import { cabeceraAutorizacion, descargarConSesion, llamarApiGet, llamarApiJson } from "@/lib/apiCliente";
 import ExtrasInvitado from "@/components/ExtrasInvitado";
 import { AYUDA_DOCUMENTO_SIN_TIPO, nombreTieneApellidos, validarDocumentoSinTipo } from "@/lib/documentoIdentidad";
 import {
@@ -63,6 +63,79 @@ function Estado({ entrada, tabla, etiqueta }: { entrada: EntradaInvitado; tabla:
       <span className={`rounded-full px-1.5 ${color}`}>{NOMBRE_ESTADO_ENTRADA[entrada.estado]}</span>
       {entrada.checkIn && <span className="text-green-700">✓ check-in</span>}
     </Link>
+  );
+}
+
+// «Generar entrada» (sin email), «Descargar entrada» y «Enviar / Reenviar por
+// email» de cada entrada de un invitado.
+function AccionesEntrada({
+  tabla,
+  etiqueta,
+  entrada,
+  conEmail,
+  onCambio,
+}: {
+  tabla: keyof typeof RUTA_FICHA;
+  etiqueta: string;
+  entrada: EntradaInvitado;
+  conEmail: boolean;
+  onCambio: () => Promise<void>;
+}) {
+  const [trabajando, setTrabajando] = useState<string | null>(null);
+  const [mensaje, setMensaje] = useState<{ ok: boolean; texto: string } | null>(null);
+
+  async function llamar(ruta: string, que: string, ok: string) {
+    setTrabajando(que);
+    setMensaje(null);
+    try {
+      const res = await fetch(ruta, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await cabeceraAutorizacion()) },
+        body: JSON.stringify({ tabla, id: entrada.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "No se pudo completar.");
+      setMensaje({ ok: true, texto: ok });
+      await onCambio();
+    } catch (e) {
+      setMensaje({ ok: false, texto: e instanceof Error ? e.message : "Error inesperado." });
+    }
+    setTrabajando(null);
+  }
+
+  async function descargar() {
+    setTrabajando("descargar");
+    setMensaje(null);
+    const fallo = await descargarConSesion(
+      `/api/entradas/imagen?tabla=${tabla}&id=${encodeURIComponent(entrada.id)}`,
+      `entrada-${tabla}.png`
+    );
+    if (fallo) setMensaje({ ok: false, texto: fallo });
+    setTrabajando(null);
+  }
+
+  const enlace = "font-medium text-[var(--balvert-azul-oscuro)] hover:underline disabled:opacity-50";
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+      <span className="w-20 font-medium text-zinc-600">{etiqueta}</span>
+      {entrada.estado === "sin_generar" ? (
+        <button type="button" disabled={!!trabajando} onClick={() => llamar("/api/entradas/generar", "generar", "Entrada generada, sin enviar.")} className={enlace}>
+          {trabajando === "generar" ? "Generando…" : "Generar entrada"}
+        </button>
+      ) : (
+        <>
+          <button type="button" disabled={!!trabajando} onClick={descargar} className={enlace}>
+            {trabajando === "descargar" ? "Descargando…" : "Descargar entrada"}
+          </button>
+          {conEmail && (
+            <button type="button" disabled={!!trabajando} onClick={() => llamar("/api/entradas/enviar", "enviar", "Entrada enviada por email.")} className={enlace}>
+              {trabajando === "enviar" ? "Enviando…" : entrada.estado === "enviada" ? "Reenviar por email" : "Enviar por email"}
+            </button>
+          )}
+        </>
+      )}
+      {mensaje && <span className={mensaje.ok ? "text-green-700" : "text-red-700"}>{mensaje.texto}</span>}
+    </div>
   );
 }
 
@@ -166,7 +239,7 @@ export default function InvitadosPatrocinador(props: Props) {
           `Invitado añadido y entrada generada, pero el email no salió (${r.errorEnvio ?? "error desconocido"}). Queda como «No enviada»: reenvíala desde su ficha.`
         );
       } else {
-        setAviso(r.enviado ? `Invitado añadido. Entrada enviada a ${emailLimpio}.` : "Invitado añadido, sin enviar la entrada todavía.");
+        setAviso(r.enviado ? `Invitado añadido. Entrada enviada a ${emailLimpio}.` : "Invitado añadido con su entrada generada, sin enviar");
       }
       limpiarFormulario();
       await cargar();
@@ -295,7 +368,7 @@ export default function InvitadosPatrocinador(props: Props) {
           )}
           <label className="flex items-center gap-2 text-sm sm:col-span-2">
             <input type="checkbox" checked={enviar} onChange={(e) => setEnviar(e.target.checked)} />
-            Enviar la entrada ahora {!enFicha && "(al crear el patrocinador)"}
+            Enviar la entrada por email ahora {!enFicha && "(al crear el patrocinador)"}
           </label>
           {porEncima && (
             <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900 sm:col-span-2">
@@ -344,6 +417,26 @@ export default function InvitadosPatrocinador(props: Props) {
                   {inv.gala && <Estado entrada={inv.gala} tabla="gala" etiqueta="Cena" />}
                   {inv.excursion && <Estado entrada={inv.excursion} tabla="excursion" etiqueta="Excursión" />}
                 </div>
+                <div className="mt-2 flex flex-col gap-1">
+                  {(
+                    [
+                      ["congreso", "Congreso"],
+                      ["gala", "Cena"],
+                      ["excursion", "Excursión"],
+                    ] as const
+                  ).map(([tabla, etiqueta]) =>
+                    inv[tabla] ? (
+                      <AccionesEntrada
+                        key={tabla}
+                        tabla={tabla}
+                        etiqueta={etiqueta}
+                        entrada={inv[tabla]!}
+                        conEmail={!!inv.email}
+                        onCambio={cargar}
+                      />
+                    ) : null
+                  )}
+                </div>
                 <ExtrasInvitado invitado={inv} resumen={resumen} modo="panel" enviar={cambiarExtra} />
               </div>
               {tieneCheckIn(inv) ? (
@@ -371,7 +464,7 @@ export default function InvitadosPatrocinador(props: Props) {
                 <p className="font-medium">{p.nombre}</p>
                 <p className="truncate text-xs text-zinc-500">
                   {p.email} · {["Congreso", p.gala && `Cena (${p.gala.menu})`, p.excursion && "Excursión"].filter(Boolean).join(" + ")} ·{" "}
-                  {p.enviar ? "se enviará la entrada al crear" : "sin enviar"}
+                  {p.enviar ? "se enviará la entrada al crear" : "entrada generada, sin enviar"}
                 </p>
               </div>
               <button

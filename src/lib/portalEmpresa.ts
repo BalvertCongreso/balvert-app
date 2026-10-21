@@ -12,6 +12,8 @@ import { generarToken, hashToken } from "@/lib/portal";
 
 export const COOKIE_EMPRESA = "balvert_empresa";
 export const DURACION_SESION_EMPRESA_MS = 7 * 24 * 60 * 60 * 1000;
+// «Ver como la empresa» desde el panel: sesión corta.
+export const DURACION_SESION_ORGANIZACION_MS = 2 * 60 * 60 * 1000;
 export const MIN_CONTRASENA = 10;
 export const MAX_CONTRASENA = 200;
 
@@ -137,13 +139,18 @@ export async function registrarFallo(supabase: SupabaseClient, usuario: string, 
 
 // ---- Sesión ----
 
-export async function crearSesionEmpresa(supabase: SupabaseClient, patrocinadorId: string) {
+// organizador: «Ver como la empresa» desde el panel (nombre de quien la abre).
+// Esa sesión dura 2 horas, no cuenta como acceso de la empresa y sus cambios
+// van a nombre de esa persona (ver autorEmpresa).
+export async function crearSesionEmpresa(supabase: SupabaseClient, patrocinadorId: string, organizador?: string) {
   const token = generarToken();
-  const expira = new Date(Date.now() + DURACION_SESION_EMPRESA_MS);
+  const expira = new Date(Date.now() + (organizador ? DURACION_SESION_ORGANIZACION_MS : DURACION_SESION_EMPRESA_MS));
   const { error } = await supabase.from("patrocinador_sesiones").insert({
     patrocinador_id: patrocinadorId,
     token_hash: hashToken(token),
     expira_en: expira.toISOString(),
+    modo_organizacion: Boolean(organizador),
+    organizador: organizador ?? null,
   });
   if (error) throw new Error(error.message);
   (await cookies()).set(COOKIE_EMPRESA, token, {
@@ -159,6 +166,9 @@ export interface SesionEmpresa {
   sesionId: string;
   patrocinadorId: string;
   usuario: string;
+  // «Ver como la empresa» desde el panel.
+  modoOrganizacion: boolean;
+  organizador: string | null;
 }
 
 // Lee la cookie y la valida contra patrocinador_sesiones (y que la empresa
@@ -169,7 +179,7 @@ export async function sesionEmpresa(): Promise<SesionEmpresa | null> {
   const supabase = crearClienteServicio();
   const { data } = await supabase
     .from("patrocinador_sesiones")
-    .select("id, patrocinador_id, expira_en")
+    .select("id, patrocinador_id, expira_en, modo_organizacion, organizador")
     .eq("token_hash", hashToken(token))
     .maybeSingle();
   if (!data || new Date(data.expira_en).getTime() <= Date.now()) return null;
@@ -178,18 +188,33 @@ export async function sesionEmpresa(): Promise<SesionEmpresa | null> {
     .select("usuario")
     .eq("patrocinador_id", data.patrocinador_id)
     .maybeSingle();
-  if (!acceso) return null;
-  return { sesionId: data.id, patrocinadorId: data.patrocinador_id, usuario: acceso.usuario };
+  // La organización puede ver la zona aunque la empresa aún no tenga acceso.
+  if (!acceso && !data.modo_organizacion) return null;
+  return {
+    sesionId: data.id,
+    patrocinadorId: data.patrocinador_id,
+    usuario: acceso?.usuario ?? "(sin acceso)",
+    modoOrganizacion: Boolean(data.modo_organizacion),
+    organizador: data.organizador ?? null,
+  };
 }
 
-// Autor en el historial y en los avisos a secretaría.
+// Autor en el historial y en los avisos a secretaría. Desde «Ver como la
+// empresa», a nombre de quien lo hace en la organización.
 export function autorEmpresa(sesion: SesionEmpresa) {
-  return `Portal: ${sesion.usuario}`;
+  return sesion.modoOrganizacion ? `Organización: ${sesion.organizador ?? "panel"}` : `Portal: ${sesion.usuario}`;
 }
 
-// Clave para los límites por hora de portal_acciones (columna "email").
+// Clave para los límites por hora de portal_acciones (columna "email"). La
+// organización no gasta el límite de la empresa.
 export function claveAcciones(sesion: SesionEmpresa) {
-  return `empresa:${sesion.usuario}`;
+  return sesion.modoOrganizacion ? `organizacion:${sesion.organizador ?? "panel"}` : `empresa:${sesion.usuario}`;
+}
+
+// Los cambios hechos por la organización («Ver como la empresa») no avisan a
+// secretaría ni le crean tareas: los ha hecho ella misma.
+export function avisaASecretaria(sesion: SesionEmpresa) {
+  return !sesion.modoOrganizacion;
 }
 
 // ---- Crear acceso / contraseña nueva (desde el panel) ----
