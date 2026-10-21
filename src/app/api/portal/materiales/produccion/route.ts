@@ -5,10 +5,13 @@ import { actualizarFichaComo } from "@/lib/patrocinadorArchivos";
 import {
   LIMITE_CAMBIOS_POR_HORA,
   MAX_ROLLUPS,
+  MENSAJE_BAJAR_ROLLUPS,
   MENSAJE_LIMITE,
+  MENSAJE_QUITAR_VINILADO,
   accionesUltimaHora,
   avisarSecretaria,
   crearTareaRevision,
+  disenosSubidos,
   edicionMaterial,
   euros,
   fichaDeLaSesion,
@@ -35,6 +38,14 @@ export async function POST(req: Request) {
 
   const precioRollup = precioOfrecido(edicion.precio_rollup);
   const precioVinilado = ficha.tiene_stand === "Sí" ? precioOfrecido(edicion.precio_vinilado) : null;
+  // No se puede pedir menos de lo que ya tiene diseño subido (decisión de Ariadna).
+  const disenos = await disenosSubidos(supabase, ficha.id);
+  if (typeof body?.rollups === "number" && body.rollups < disenos.rollup) {
+    return NextResponse.json({ error: MENSAJE_BAJAR_ROLLUPS }, { status: 400 });
+  }
+  if (body?.vinilado === false && disenos.vinilado > 0) {
+    return NextResponse.json({ error: MENSAJE_QUITAR_VINILADO }, { status: 400 });
+  }
   const cambios: Record<string, string | number> = {};
   const lineas: string[] = [];
   const resumen: string[] = [];

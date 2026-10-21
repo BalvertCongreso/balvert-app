@@ -172,11 +172,15 @@ export function tieneProduccion(e: EmpresaMaterial) {
   return Boolean(e.produccion.precioRollup || e.produccion.precioVinilado);
 }
 
-// Rollups incluidos en la colocación según la categoría (dossier).
-const ROLLUPS_INCLUIDOS: Record<string, { nombre: string; rollups: number }> = {
-  "💎 DIAMANTE": { nombre: "Diamante", rollups: 2 },
-  "⭐ ORO": { nombre: "Oro", rollups: 1 },
+// Categorías con mostrador, para «Vuestro mostrador (Oro)».
+const NOMBRE_CATEGORIA_MOSTRADOR: Record<string, string> = {
+  "💎 DIAMANTE": "Diamante",
+  "⭐ ORO": "Oro",
 };
+
+// Mismos textos que el servidor (/api/portal/materiales/produccion).
+const MENSAJE_BAJAR_ROLLUPS = "Para pedir menos rollups, quita primero algún diseño.";
+const MENSAJE_QUITAR_VINILADO = "Para quitar el vinilado, quita primero su diseño.";
 
 // «92 cm de ancho × 93 cm de alto × 46 cm de fondo, 6 m² disponibles» →
 // recuadros (medida + qué es) y el texto que no sea una medida («espacio doble»).
@@ -206,7 +210,14 @@ export function SeccionProduccion({ e, onGuardado }: { e: EmpresaMaterial; onGua
   const cambiaRollups = Boolean(p.precioRollup) && rollups !== p.rollupsSolicitados;
   const cambiaVinilado = Boolean(p.precioVinilado) && vinilado !== p.vinilado;
   const hayCambios = cambiaRollups || cambiaVinilado;
-  const incluidos = e.categoria ? ROLLUPS_INCLUIDOS[e.categoria] : undefined;
+  const categoria = e.categoria ? NOMBRE_CATEGORIA_MOSTRADOR[e.categoria] : undefined;
+  // Diseños ya subidos por la empresa, del más antiguo al más nuevo: llenan
+  // los huecos en ese orden. No se puede pedir por debajo de ellos.
+  const disenos = (tipo: "rollup" | "vinilado") =>
+    e.subidos.filter((a) => a.tipo === tipo).sort((a, b) => a.creado.localeCompare(b.creado));
+  const disenosRollup = disenos("rollup");
+  const disenosVinilado = disenos("vinilado");
+  const sinPedido = p.rollupsSolicitados === 0 && !p.vinilado;
   const medidas = p.medidas ? trozosMedidas(p.medidas) : null;
 
   // Lo pedido en pantalla (guardado o no) y su total.
@@ -223,7 +234,8 @@ export function SeccionProduccion({ e, onGuardado }: { e: EmpresaMaterial; onGua
 
   function cambiarRollups(d: number) {
     setOk(null);
-    setRollups((n) => Math.max(0, Math.min(MAX_ROLLUPS, n + d)));
+    setError(null);
+    setRollups((n) => Math.max(disenosRollup.length, Math.min(MAX_ROLLUPS, n + d)));
   }
 
   async function guardar() {
@@ -276,17 +288,7 @@ export function SeccionProduccion({ e, onGuardado }: { e: EmpresaMaterial; onGua
                 <small className="text-[13px] font-semibold text-[#5d6b76]">+ IVA cada uno · 150 × 200 cm</small>
               </p>
               <p className="rounded-lg border-l-4 border-[var(--balvert-azul)] bg-[#f1f7fb] px-3 py-2.5 text-[13px] leading-relaxed text-[#29404f]">
-                {incluidos ? (
-                  <>
-                    Vuestro patrocinio {incluidos.nombre} ya incluye la{" "}
-                    <strong>
-                      colocación de {incluidos.rollups} rollup{incluidos.rollups === 1 ? "" : "s"}
-                    </strong>{" "}
-                    en el congreso. Aquí podéis pedirnos que os fabriquemos los que queráis.
-                  </>
-                ) : (
-                  "Podéis pedirnos que os fabriquemos los que queráis."
-                )}
+                Os fabricamos todos los rollups que queráis. Elegid cuántos y subid el diseño de cada uno.
               </p>
               <p id={`rollups-${e.id}`} className="text-sm font-bold">
                 ¿Cuántos queréis que os fabriquemos?
@@ -300,7 +302,7 @@ export function SeccionProduccion({ e, onGuardado }: { e: EmpresaMaterial; onGua
                   type="button"
                   aria-label="Uno menos"
                   onClick={() => cambiarRollups(-1)}
-                  disabled={rollups <= 0}
+                  disabled={rollups <= disenosRollup.length}
                   className="h-12 w-12 bg-[#f3f6f8] text-2xl text-[var(--balvert-azul-oscuro)] disabled:opacity-40"
                 >
                   −
@@ -321,6 +323,20 @@ export function SeccionProduccion({ e, onGuardado }: { e: EmpresaMaterial; onGua
               <p className="text-sm text-[#5d6b76]">
                 Subtotal: <strong className="text-[#1f2a33]">{euros(rollups * p.precioRollup)}</strong> + IVA
               </p>
+              {disenosRollup.length > 0 && rollups <= disenosRollup.length && (
+                <p className="text-xs text-[#5d6b76]">{MENSAJE_BAJAR_ROLLUPS}</p>
+              )}
+              {!sinPedido && (
+                <Disenos
+                  e={e}
+                  tipo="rollup"
+                  huecos={p.rollupsSolicitados}
+                  subidos={disenosRollup}
+                  pendienteGuardar={hayCambios}
+                  vacio="Cuando pidáis rollups, aquí podréis subir el diseño de cada uno."
+                  onCambio={onGuardado}
+                />
+              )}
             </div>
           </Tarjeta>
         )}
@@ -334,7 +350,7 @@ export function SeccionProduccion({ e, onGuardado }: { e: EmpresaMaterial; onGua
               {medidas && (medidas.recuadros.length > 0 || medidas.otros.length > 0) && (
                 <div className="flex flex-col gap-2">
                   <p className="text-[13px] text-[#5d6b76]">
-                    Vuestro mostrador{incluidos ? ` (${incluidos.nombre})` : ""}
+                    Vuestro mostrador{categoria ? ` (${categoria})` : ""}
                     {medidas.otros.length > 0 ? `: ${medidas.otros.join(" · ")}` : ":"}
                   </p>
                   {medidas.recuadros.length > 0 && (
@@ -359,6 +375,8 @@ export function SeccionProduccion({ e, onGuardado }: { e: EmpresaMaterial; onGua
                 aria-checked={vinilado}
                 onClick={() => {
                   setOk(null);
+                  if (vinilado && disenosVinilado.length > 0) return setError(MENSAJE_QUITAR_VINILADO);
+                  setError(null);
                   setVinilado((v) => !v);
                 }}
                 className={`flex items-center gap-3 rounded-xl border-2 p-3 text-left ${
@@ -380,13 +398,28 @@ export function SeccionProduccion({ e, onGuardado }: { e: EmpresaMaterial; onGua
                 <span className="text-sm">
                   <b>Sí, queremos el vinilado</b>
                   <br />
-                  <small className="text-[#5d6b76]">Os pediremos el diseño en «Material».</small>
+                  <small className="text-[#5d6b76]">Después podréis subir su diseño aquí abajo.</small>
                 </span>
               </button>
+              {!sinPedido && (
+                <Disenos
+                  e={e}
+                  tipo="vinilado"
+                  huecos={p.vinilado ? 1 : 0}
+                  subidos={disenosVinilado}
+                  pendienteGuardar={hayCambios}
+                  vacio="Cuando pidáis el vinilado, aquí podréis subir su diseño."
+                  onCambio={onGuardado}
+                />
+              )}
             </div>
           </Tarjeta>
         )}
       </div>
+
+      {sinPedido && (
+        <p className="text-sm text-[#5d6b76]">Cuando pidáis rollups o el vinilado, aquí podréis subir sus diseños.</p>
+      )}
 
       {error && <Aviso tipo="error">{error}</Aviso>}
       {ok && <Aviso tipo="ok">{ok}</Aviso>}
@@ -415,6 +448,173 @@ export function SeccionProduccion({ e, onGuardado }: { e: EmpresaMaterial; onGua
       </div>
     </>
   );
+}
+
+// Bloque «Diseños» de una tarjeta de «Rollups y vinilado»: un hueco por
+// rollup pedido (o uno del vinilado), según lo GUARDADO. Misma subida que
+// Material (/api/portal/materiales/subida y /archivo), que además comprueba
+// en el servidor que no se pase de lo pedido.
+function Disenos({
+  e,
+  tipo,
+  huecos,
+  subidos,
+  pendienteGuardar,
+  vacio,
+  onCambio,
+}: {
+  e: EmpresaMaterial;
+  tipo: "rollup" | "vinilado";
+  huecos: number;
+  subidos: ArchivoSubido[];
+  pendienteGuardar: boolean;
+  vacio: string;
+  onCambio: () => void;
+}) {
+  const [progreso, setProgreso] = useState<{ hueco: number; pct: number } | null>(null);
+  const [quitando, setQuitando] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [huecoElegido, setHuecoElegido] = useState(0);
+  const nombre = tipo === "rollup" ? "rollup" : "vinilado";
+  // Si Ariadna ha bajado el pedido desde el panel, se enseñan igualmente
+  // todos los diseños subidos.
+  const total = Math.max(huecos, subidos.length);
+
+  async function subir(archivo: File | null, hueco: number) {
+    if (inputRef.current) inputRef.current.value = "";
+    if (!archivo) return;
+    setError(null);
+    setOk(null);
+    const problema = problemaArchivo(archivo);
+    if (problema) return setError(problema);
+    setProgreso({ hueco, pct: 0 });
+    try {
+      const { ruta, token, tipo: tipoMime } = await enviarJson("/api/portal/materiales/subida", {
+        patrocinador_id: e.id,
+        tipo,
+        nombre: archivo.name,
+        tamano: archivo.size,
+      });
+      await subirConProgreso(ruta, token, archivo, tipoMime, (pct) => setProgreso({ hueco, pct }));
+      await enviarJson("/api/portal/materiales/archivo", { patrocinador_id: e.id, ruta, tipo, comentario: "" });
+      setOk(`${TEXTO_TIPO[tipo].recibido}. Lo revisaremos y te avisaremos si hace falta algo.`);
+      onCambio();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se ha podido subir el archivo. Inténtalo de nuevo.");
+    }
+    setProgreso(null);
+  }
+
+  async function quitar(a: ArchivoSubido) {
+    if (!window.confirm(`¿Quitar el diseño «${a.nombre}»? Se borrará también para nosotros y no se puede deshacer.`)) return;
+    setError(null);
+    setOk(null);
+    setQuitando(a.id);
+    try {
+      const res = await fetch(`/api/portal/materiales/archivo?id=${encodeURIComponent(a.id)}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "No se ha podido quitar. Inténtalo de nuevo.");
+      onCambio();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se ha podido quitar. Inténtalo de nuevo.");
+    }
+    setQuitando(null);
+  }
+
+  return (
+    <div className="mt-1 flex flex-col gap-2 border-t border-[#e3e8ec] pt-4">
+      <p className="text-sm font-bold text-[var(--balvert-marron)]">Diseños</p>
+      {total === 0 ? (
+        <p className="text-sm text-[#5d6b76]">{vacio}</p>
+      ) : (
+        <>
+          {pendienteGuardar && <Aviso tipo="info">Guarda tu pedido para poder subir los diseños.</Aviso>}
+          <input
+            ref={inputRef}
+            type="file"
+            accept={ACEPTADOS}
+            hidden
+            aria-label={`Diseño del ${nombre}`}
+            onChange={(ev) => subir(ev.target.files?.[0] ?? null, huecoElegido)}
+          />
+          <ul className="flex flex-col gap-2">
+            {Array.from({ length: total }, (_, i) => {
+              const a = subidos[i];
+              const subiendo = progreso?.hueco === i;
+              return (
+                <li key={i} className="flex flex-col gap-2 rounded-[10px] border border-[#e3e8ec] px-3 py-2.5 text-sm min-[480px]:flex-row min-[480px]:items-center">
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-center gap-2">
+                      <span>
+                        {tipo === "rollup" ? `Diseño del rollup ${i + 1} de ${total}` : "Diseño del vinilado"} —
+                      </span>
+                      <Etiqueta bien={Boolean(a)}>{a ? "Recibido" : "Pendiente"}</Etiqueta>
+                    </p>
+                    {a && <p className="mt-0.5 break-all text-xs text-[#5d6b76]">{a.nombre}</p>}
+                    {subiendo && (
+                      <div className="mt-1.5">
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-200">
+                          <div className="h-full rounded-full bg-[var(--balvert-azul-oscuro)]" style={{ width: `${progreso.pct}%` }} />
+                        </div>
+                        <p className="mt-0.5 text-xs text-zinc-600">Subiendo… {progreso.pct}%. No cierres esta página.</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    {a ? (
+                      <>
+                        <a href={`/api/portal/materiales/descargar?id=${encodeURIComponent(a.id)}`} className={botonSecundario}>
+                          Descargar
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => quitar(a)}
+                          disabled={quitando === a.id || progreso !== null}
+                          className="min-h-11 rounded-md border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+                        >
+                          {quitando === a.id ? "Quitando…" : "Quitar"}
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={pendienteGuardar || progreso !== null}
+                        onClick={() => {
+                          setHuecoElegido(i);
+                          inputRef.current?.click();
+                        }}
+                        className={botonSecundario + " disabled:opacity-50"}
+                      >
+                        {subiendo ? "Subiendo…" : "Subir diseño"}
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="text-xs text-[#5d6b76]">
+            Formatos: {FORMATOS_PERMITIDOS}. Máximo 50 MB por archivo.
+          </p>
+          {error && <Aviso tipo="error">{error}</Aviso>}
+          {ok && <Aviso tipo="ok">{ok}</Aviso>}
+        </>
+      )}
+    </div>
+  );
+}
+
+// Comprobación al elegir el archivo, para avisar antes de subirlo.
+function problemaArchivo(f: File): string | null {
+  if (!TIPO_POR_EXTENSION[extensionDe(f.name)]) {
+    return `Este tipo de archivo no se puede subir. Formatos aceptados: ${FORMATOS_PERMITIDOS}.`;
+  }
+  if (f.size > TAMANO_MAXIMO_ARCHIVO) {
+    return "Este archivo pesa más de 50 MB. Envíalo por WeTransfer a secretaria@balvert.es.";
+  }
+  return null;
 }
 
 // ---- Pestaña "Material" ----
@@ -476,9 +676,9 @@ function ponenteCompleto(p: Ponente | null) {
   );
 }
 
-// La ponencia tiene su propia pestaña (SeccionPonencia): Material se queda
-// con el logo y los diseños de rollup y vinilado.
-const TIPOS_MATERIAL: readonly TipoArchivoPortal[] = ["logo", "rollup", "vinilado"];
+// La ponencia y los diseños de rollup y vinilado tienen su pestaña
+// (SeccionPonencia, SeccionProduccion): Material se queda con el logo.
+const TIPOS_MATERIAL: readonly TipoArchivoPortal[] = ["logo"];
 const TIPOS_PONENCIA: readonly TipoArchivoPortal[] = ["ponencia"];
 
 // Quién ve la pestaña «Ponencia»: Diamante y Oro (la deciden ellos) y quien
@@ -564,7 +764,7 @@ export function SeccionMaterial({
         </ul>
         {(p.precioRollup || p.precioVinilado) && (
           <p className="mt-3 text-xs text-zinc-500">
-            Los rollups y el vinilado se piden en la pestaña{" "}
+            Los rollups y el vinilado se piden, y sus diseños se suben, en la pestaña{" "}
             <button type="button" onClick={irAProduccion} className="font-medium text-[var(--balvert-azul-oscuro)] underline">
               Rollups y vinilado
             </button>
@@ -643,17 +843,6 @@ function Subir({
   const [ok, setOk] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Comprobación al elegir el archivo, para avisar antes de pulsar Enviar.
-  function problemaArchivo(f: File): string | null {
-    if (!TIPO_POR_EXTENSION[extensionDe(f.name)]) {
-      return `Este tipo de archivo no se puede subir. Formatos aceptados: ${FORMATOS_PERMITIDOS}.`;
-    }
-    if (f.size > TAMANO_MAXIMO_ARCHIVO) {
-      return "Este archivo pesa más de 50 MB. Envíalo por WeTransfer a secretaria@balvert.es.";
-    }
-    return null;
-  }
-
   function elegirArchivo(f: File | null) {
     setOk(null);
     setArchivo(f);
@@ -692,7 +881,13 @@ function Subir({
 
   return (
     <Bloque
-      titulo={tipos.length === 1 && tipos[0] === "ponencia" ? "Enviarnos la presentación" : "Enviarnos un archivo"}
+      titulo={
+        tipos.length === 1 && tipos[0] === "ponencia"
+          ? "Enviarnos la presentación"
+          : tipos.length === 1 && tipos[0] === "logo"
+            ? "Enviarnos el logo"
+            : "Enviarnos un archivo"
+      }
       ayuda="Sigue estos pasos. Puedes enviar varios archivos, uno detrás de otro."
     >
       <form onSubmit={subir} className="flex flex-col gap-5">

@@ -16,7 +16,9 @@ import {
   LIMITE_SUBIDAS_POR_HORA,
   MENSAJE_LIMITE,
   accionesUltimaHora,
+  disenosSubidos,
   edicionMaterial,
+  limiteDiseno,
   fichaDeLaSesion,
   registrarAccion,
 } from "@/lib/portalMateriales";
@@ -48,6 +50,9 @@ export async function POST(req: Request) {
   const edicion = await edicionMaterial(supabase);
   const ficha = edicion ? await fichaDeLaSesion(supabase, edicion.id, sesion.patrocinadorId) : null;
   if (!ficha) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
+  // Diseños de rollup/vinilado: solo hasta lo pedido (se vuelve a mirar al registrarlo).
+  const limite = limiteDiseno(ficha, body.tipo, await disenosSubidos(supabase, ficha.id));
+  if (limite) return NextResponse.json({ error: limite }, { status: 400 });
 
   if ((await accionesUltimaHora(supabase, claveAcciones(sesion), ["preparar_subida"])) >= LIMITE_SUBIDAS_POR_HORA) {
     return NextResponse.json({ error: MENSAJE_LIMITE }, { status: 429 });

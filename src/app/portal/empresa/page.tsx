@@ -93,7 +93,7 @@ const PESTANAS: { id: Pestana; titulo: string; intro: string }[] = [
     id: "material",
     titulo: "Material",
     intro:
-      "Aquí puedes enviarnos el logo y los diseños de rollup y vinilado. Cuando subas algo, nos llega un aviso y lo revisamos.",
+      "Aquí puedes enviarnos el logo de la empresa. Cuando lo subas, nos llega un aviso y lo revisamos. Los diseños de rollup y vinilado se suben en «Rollups y vinilado».",
   },
   {
     id: "documentos",

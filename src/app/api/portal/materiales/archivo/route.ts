@@ -13,7 +13,9 @@ import {
 import {
   avisarSecretaria,
   crearTareaRevision,
+  disenosSubidos,
   edicionMaterial,
+  limiteDiseno,
   fichaDeLaSesion,
   nombreEmpresa,
 } from "@/lib/portalMateriales";
@@ -64,6 +66,13 @@ export async function POST(req: Request) {
   const { data: existe } = await bucket.exists(ruta);
   if (!existe) return NextResponse.json({ error: "El archivo no se ha subido. Inténtalo de nuevo." }, { status: 400 });
 
+  // Diseños de rollup/vinilado: solo hasta lo pedido y guardado.
+  const limite = limiteDiseno(ficha, tipo, await disenosSubidos(supabase, ficha.id));
+  if (limite) {
+    await bucket.remove([ruta]);
+    return NextResponse.json({ error: limite }, { status: 400 });
+  }
+
   const autor = autorEmpresa(sesion);
   const { error } = await supabase.from("patrocinador_archivos").insert({
     patrocinador_id: ficha.id,
@@ -81,6 +90,17 @@ export async function POST(req: Request) {
     if (error.code !== "23505") await bucket.remove([ruta]);
     console.error("portal/materiales/archivo: no se pudo guardar", error.code, error.message);
     return NextResponse.json({ error: "No se pudo guardar el archivo. Inténtalo de nuevo." }, { status: 500 });
+  }
+  // Dos subidas a la vez podrían pasar las dos la comprobación: si ahora hay
+  // más de lo pedido, se deshace esta.
+  if (tipo === "rollup" || tipo === "vinilado") {
+    const ahora = await disenosSubidos(supabase, ficha.id);
+    const maximo = tipo === "rollup" ? ficha.rollups_solicitados ?? 0 : ficha.vinilado_por_nuestra_cuenta === "Sí" ? 1 : 0;
+    if (ahora[tipo] > maximo) {
+      await supabase.from("patrocinador_archivos").delete().eq("ruta_archivo", ruta);
+      await bucket.remove([ruta]);
+      return NextResponse.json({ error: limiteDiseno(ficha, tipo, { rollup: maximo, vinilado: maximo }) }, { status: 400 });
+    }
   }
 
   const casilla = CASILLA_POR_TIPO[tipo];

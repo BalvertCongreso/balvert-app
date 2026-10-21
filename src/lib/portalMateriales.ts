@@ -56,6 +56,49 @@ export function precioOfrecido(precio: unknown): number | null {
 
 export const MAX_ROLLUPS = 99;
 
+// ---- Diseños de rollup y vinilado (pestaña «Rollups y vinilado») ----
+// Desde la zona de empresa solo se suben hasta lo pedido y guardado: un diseño
+// por rollup y uno del vinilado si está pedido. Cuentan los que ha subido la
+// empresa (los del equipo, desde el panel, no tienen límite).
+
+export const MENSAJE_BAJAR_ROLLUPS = "Para pedir menos rollups, quita primero algún diseño.";
+export const MENSAJE_QUITAR_VINILADO = "Para quitar el vinilado, quita primero su diseño.";
+
+export async function disenosSubidos(supabase: SupabaseClient, patrocinadorId: string) {
+  const { data, error } = await supabase
+    .from("patrocinador_archivos")
+    .select("tipo")
+    .eq("patrocinador_id", patrocinadorId)
+    .eq("origen", "patrocinador")
+    .in("tipo", ["rollup", "vinilado"]);
+  if (error) throw new Error(error.message);
+  return {
+    rollup: (data ?? []).filter((a) => a.tipo === "rollup").length,
+    vinilado: (data ?? []).filter((a) => a.tipo === "vinilado").length,
+  };
+}
+
+// null si se puede subir un diseño más de ese tipo (contando ya «subidos»);
+// si no, el mensaje para la empresa.
+export function limiteDiseno(
+  ficha: Pick<FichaPortal, "rollups_solicitados" | "vinilado_por_nuestra_cuenta">,
+  tipo: string,
+  subidos: { rollup: number; vinilado: number }
+): string | null {
+  if (tipo === "rollup") {
+    const pedidos = ficha.rollups_solicitados ?? 0;
+    if (pedidos === 0) return "Primero pedid los rollups y guardad el pedido; después podréis subir sus diseños.";
+    if (subidos.rollup >= pedidos) return "Ya habéis subido los diseños de todos los rollups pedidos.";
+  }
+  if (tipo === "vinilado") {
+    if (ficha.vinilado_por_nuestra_cuenta !== "Sí") {
+      return "Primero pedid el vinilado y guardad el pedido; después podréis subir su diseño.";
+    }
+    if (subidos.vinilado >= 1) return "Ya habéis subido los diseños del vinilado.";
+  }
+  return null;
+}
+
 // Medidas del mostrador de UNA categoría, sacadas del texto de Ediciones
 // («Medidas y condiciones»), que las trae juntas en líneas como
 // «- Oro: mostrador de 92 cm de ancho × …» y «- Diamante: …». Así se siguen
