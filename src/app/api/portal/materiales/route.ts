@@ -89,6 +89,8 @@ export async function GET() {
         respuesta: f.tiene_ponencia === "Sí" || f.tiene_ponencia === "No" ? f.tiene_ponencia : null,
         maxMinutos: f.categoria ? PONENCIA_POR_CATEGORIA[f.categoria]?.maxMinutos ?? null : null,
         explicacion: f.categoria ? PONENCIA_POR_CATEGORIA[f.categoria]?.explicacion ?? null : null,
+        // Diamante/Oro: duración fija de la categoría (texto para la pantalla).
+        duracionFija: f.categoria ? PONENCIA_POR_CATEGORIA[f.categoria]?.duracion ?? null : null,
       },
       ponente:
         tienePonencia || (f.categoria && PONENCIA_POR_CATEGORIA[f.categoria])

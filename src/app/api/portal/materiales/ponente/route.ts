@@ -25,14 +25,14 @@ const CAMPOS_TEXTO = [
   { clave: "ponente_telefono", etiqueta: "Teléfono del ponente", max: 40 },
   { clave: "ponencia_titulo", etiqueta: "Título de la ponencia", max: 300 },
 ] as const;
-// Categorías sin ponencia incluida (la decide la organización): sin tope propio.
-const MAX_DURACION_GENERAL = 600;
 const TELEFONO_REGEX = /^[+\d][\d\s().-]{5,39}$/;
 
 // Ponencia desde la zona de empresa. Diamante y Oro (la incluyen) responden
-// «¿Vais a hacer ponencia?» (tiene_ponencia) y rellenan los datos, con la
-// duración máxima de su patrocinio. En las demás categorías solo se rellenan
-// los datos si la organización ha puesto «¿Tiene ponencia?: Sí».
+// «¿Vais a hacer ponencia?» (tiene_ponencia) y rellenan los datos; la
+// duración es la fija de su categoría y se guarda sola. En las demás
+// categorías solo se rellenan los datos si la organización ha puesto
+// «¿Tiene ponencia?: Sí», y la duración la pone ella desde el panel. Desde la
+// zona de empresa nunca se acepta una duración.
 export async function POST(req: Request) {
   const sesion = await sesionEmpresa();
   if (!sesion) return NextResponse.json({ error: "Tu sesión ha caducado. Vuelve a entrar." }, { status: 401 });
@@ -72,22 +72,7 @@ export async function POST(req: Request) {
       }
       nuevos[clave] = limpio || null;
     }
-    const duracion = body?.ponencia_duracion_min;
-    const maximo = regla?.maxMinutos ?? MAX_DURACION_GENERAL;
-    if (duracion === null || duracion === "") {
-      nuevos.ponencia_duracion_min = null;
-    } else if (duracion !== undefined) {
-      if (typeof duracion !== "number" || !Number.isInteger(duracion) || duracion < 1) {
-        return NextResponse.json({ error: "La duración tiene que ser un número de minutos (sin decimales)." }, { status: 400 });
-      }
-      if (duracion > maximo) {
-        return NextResponse.json(
-          { error: regla ? `La duración máxima de vuestra ponencia es de ${maximo} minutos. ${regla.explicacion}` : "Duración no válida." },
-          { status: 400 }
-        );
-      }
-      nuevos.ponencia_duracion_min = duracion;
-    }
+    if (regla) nuevos.ponencia_duracion_min = regla.maxMinutos;
   } else if (Object.keys(nuevos).length === 0) {
     return NextResponse.json({ error: "Tu patrocinio no tiene ponencia." }, { status: 403 });
   }

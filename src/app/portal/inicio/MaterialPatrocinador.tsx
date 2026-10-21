@@ -75,6 +75,7 @@ export interface EmpresaMaterial {
     respuesta: "Sí" | "No" | null;
     maxMinutos: number | null;
     explicacion: string | null;
+    duracionFija: string | null;
   };
   ponente: Ponente | null;
   subidos: ArchivoSubido[];
@@ -470,7 +471,8 @@ function FechaLimite({ iso }: { iso: string }) {
 
 function ponenteCompleto(p: Ponente | null) {
   return Boolean(
-    p && p.ponente_nombre && p.ponente_cargo && p.ponente_email && p.ponente_telefono && p.ponencia_titulo && p.ponencia_duracion_min
+    // La duración no cuenta: es fija (Diamante/Oro) o la pone la organización.
+    p && p.ponente_nombre && p.ponente_cargo && p.ponente_email && p.ponente_telefono && p.ponencia_titulo
   );
 }
 
@@ -918,14 +920,18 @@ function DatosPonente({
   conRespuesta?: boolean;
   sinMarco?: boolean;
 }) {
-  const maxMinutos = e.ponencia.maxMinutos ?? 600;
+  // La duración no se escribe: la de su categoría o la que ponga la organización.
+  const duracion = e.ponencia.duracionFija
+    ? `Duración de vuestra ponencia: ${e.ponencia.duracionFija}.`
+    : ponente.ponencia_duracion_min
+      ? `Duración de vuestra ponencia: ${ponente.ponencia_duracion_min} minutos.`
+      : "La duración os la confirmará la organización.";
   const [valores, setValores] = useState({
     ponente_nombre: ponente.ponente_nombre ?? "",
     ponente_cargo: ponente.ponente_cargo ?? "",
     ponente_email: ponente.ponente_email ?? "",
     ponente_telefono: ponente.ponente_telefono ?? "",
     ponencia_titulo: ponente.ponencia_titulo ?? "",
-    ponencia_duracion_min: ponente.ponencia_duracion_min != null ? String(ponente.ponencia_duracion_min) : "",
   });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -935,15 +941,6 @@ function DatosPonente({
     ev.preventDefault();
     setError(null);
     setOk(false);
-    const duracion = valores.ponencia_duracion_min.trim();
-    if (duracion !== "" && !/^\d+$/.test(duracion)) {
-      setError("En «Duración» escribe solo el número de minutos, sin decimales (por ejemplo, 10).");
-      return;
-    }
-    if (duracion !== "" && Number(duracion) > maxMinutos) {
-      setError(`La duración máxima de vuestra ponencia es de ${maxMinutos} minutos.`);
-      return;
-    }
     setGuardando(true);
     try {
       await enviarJson("/api/portal/materiales/ponente", {
@@ -954,7 +951,6 @@ function DatosPonente({
         ponente_telefono: valores.ponente_telefono,
         ponencia_titulo: valores.ponencia_titulo,
         ...(conRespuesta ? { tiene_ponencia: "Sí" } : {}),
-        ponencia_duracion_min: duracion === "" ? null : Number(duracion),
       });
       setOk(true);
       onGuardado();
@@ -973,10 +969,7 @@ function DatosPonente({
         id={`${clave}-${e.id}`}
         type={tipo}
         className="campo-input text-base"
-        maxLength={tipo !== "number" ? max : undefined}
-        min={tipo === "number" ? 1 : undefined}
-        max={tipo === "number" ? max : undefined}
-        inputMode={tipo === "number" ? "numeric" : undefined}
+        maxLength={max}
         value={valores[clave]}
         onChange={(ev) => setValores((v) => ({ ...v, [clave]: ev.target.value }))}
       />
@@ -993,16 +986,10 @@ function DatosPonente({
         <div className="sm:col-span-2">
           {campo("ponencia_titulo", "Título de la ponencia", "Si aún no es definitivo, pon uno provisional.", 300)}
         </div>
-        {campo(
-          "ponencia_duracion_min",
-          "Duración (minutos)",
-          e.ponencia.maxMinutos ? `Máximo ${e.ponencia.maxMinutos} minutos.` : "Solo el número, por ejemplo 15.",
-          maxMinutos,
-          "number"
-        )}
-        <p className="self-end text-xs text-zinc-500 sm:pb-6">
-          La presentación se sube más abajo, en «Enviarnos la presentación».
-        </p>
+        <div className="flex flex-col gap-1 sm:col-span-2">
+          <p className="text-sm font-semibold text-zinc-800">{duracion}</p>
+          <p className="text-xs text-zinc-500">La presentación se sube más abajo, en «Enviarnos la presentación».</p>
+        </div>
         <div className="flex flex-col gap-3 sm:col-span-2">
           {error && <Aviso tipo="error">{error}</Aviso>}
           {ok && <Aviso tipo="ok">Datos del ponente guardados. Gracias.</Aviso>}

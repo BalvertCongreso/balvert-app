@@ -39,13 +39,17 @@ export const CAMPOS_EMPRESA = [...CAMPOS_CONTACTO, ...CAMPOS_FACTURACION_EMPRESA
 
 // Ponencia (dossier): Diamante y Oro la incluyen y la rellena la propia
 // empresa; en las demás categorías la decide la organización.
-export const PONENCIA_POR_CATEGORIA: Record<string, { maxMinutos: number; explicacion: string }> = {
+// La duración es fija según la categoría (decisión de Ariadna, 21/10/2026):
+// la empresa no la escribe; se guarda sola en la ficha (maxMinutos).
+export const PONENCIA_POR_CATEGORIA: Record<string, { maxMinutos: number; explicacion: string; duracion: string }> = {
   "💎 DIAMANTE": {
     maxMinutos: 15,
-    explicacion: "Patrocinio Diamante: hasta 15 minutos (5 de presentación de empresa o producto + 10 de caso técnico).",
+    explicacion: "Patrocinio Diamante: 15 minutos (5 de presentación de empresa o producto + 10 de caso técnico).",
+    duracion: "15 minutos (5 de presentación de empresa o producto + 10 de caso técnico)",
   },
   "⭐ ORO": {
     maxMinutos: 10,
-    explicacion: "Patrocinio Oro: hasta 10 minutos (5 de presentación de empresa o producto + 5 de caso técnico).",
+    explicacion: "Patrocinio Oro: 10 minutos (5 de presentación de empresa o producto + 5 de caso técnico).",
+    duracion: "10 minutos (5 de presentación de empresa o producto + 5 de caso técnico)",
   },
 };

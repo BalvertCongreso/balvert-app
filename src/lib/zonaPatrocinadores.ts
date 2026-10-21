@@ -123,7 +123,8 @@ export async function estadoPatrocinadores(
     const ponenteCompleto =
       f.tiene_ponencia === "Sí"
         ? Boolean(
-            f.ponente_nombre && f.ponente_cargo && f.ponente_email && f.ponente_telefono && f.ponencia_titulo && f.ponencia_duracion_min
+            // La duración no: es fija (Diamante/Oro) o la pone la organización.
+            f.ponente_nombre && f.ponente_cargo && f.ponente_email && f.ponente_telefono && f.ponencia_titulo
           )
         : null;
     const materialNuevo = suyos.filter((a) => a.origen === "patrocinador" && !a.revisado_en).length;
