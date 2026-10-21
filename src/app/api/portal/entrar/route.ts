@@ -53,6 +53,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "No se pudo entrar. Inténtalo de nuevo." }, { status: 500 });
   }
 
+  // Último acceso (para la Zona de clientes del panel): si falla, se entra igual.
+  await supabase
+    .from("clientes_accesos")
+    .upsert({ email, ultimo_acceso: new Date().toISOString() })
+    .then(({ error: e }) => e && console.error("portal/entrar: último acceso", e.message));
+
   (await cookies()).set(COOKIE_PORTAL, tokenSesion, {
     httpOnly: true,
     secure: true,

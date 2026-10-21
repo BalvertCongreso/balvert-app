@@ -46,7 +46,6 @@ export async function POST(req: Request) {
   const titulo = typeof body.titulo === "string" ? body.titulo.trim() : "";
   const descripcion = typeof body.descripcion === "string" ? body.descripcion.trim() : "";
   const destino = body.destino;
-  const patrocinadorId = typeof body.patrocinador_id === "string" && body.patrocinador_id ? body.patrocinador_id : null;
   const ruta = typeof body.ruta_archivo === "string" ? body.ruta_archivo : null;
   const emailDestinatario = normalizarEmail(body.email_destinatario);
   // Solo para destino "Una persona": avisarle por email al subir el archivo
@@ -62,8 +61,13 @@ export async function POST(req: Request) {
   if (!esDestino(destino)) {
     return NextResponse.json({ error: "Elige a quién va el documento." }, { status: 400 });
   }
-  if (destino === "patrocinador" && !patrocinadorId) {
-    return NextResponse.json({ error: "Elige la empresa patrocinadora." }, { status: 400 });
+  // Lo de una empresa ya no va aquí: se sube en su espacio de la Zona de
+  // patrocinadores (patrocinador_archivos, «Visible para la empresa»).
+  if (destino === "patrocinador") {
+    return NextResponse.json(
+      { error: "Los documentos de una empresa se suben desde su espacio en la Zona de patrocinadores." },
+      { status: 400 }
+    );
   }
   if (destino === "asistente" && !EMAIL_REGEX.test(emailDestinatario)) {
     return NextResponse.json({ error: "Escribe el email de la persona." }, { status: 400 });
@@ -73,18 +77,6 @@ export async function POST(req: Request) {
   const edicionId = await idEdicionActiva(supabase);
   if (!edicionId) {
     return NextResponse.json({ error: "No hay ninguna edición activa." }, { status: 400 });
-  }
-
-  if (destino === "patrocinador") {
-    const { data: patrocinador } = await supabase
-      .from("patrocinadores")
-      .select("id")
-      .eq("id", patrocinadorId!)
-      .eq("edicion_id", edicionId)
-      .maybeSingle();
-    if (!patrocinador) {
-      return NextResponse.json({ error: "Esa empresa no está en la edición activa." }, { status: 400 });
-    }
   }
 
   // Para evitar erratas: el email tiene que poder entrar en su zona personal
@@ -115,7 +107,7 @@ export async function POST(req: Request) {
     titulo,
     descripcion: descripcion || null,
     destino,
-    patrocinador_id: destino === "patrocinador" ? patrocinadorId : null,
+    patrocinador_id: null,
     email_destinatario: destino === "asistente" ? emailDestinatario : null,
     ...(ruta && { ruta_archivo: ruta, nombre_archivo: ruta.split("/").pop()! }),
   };

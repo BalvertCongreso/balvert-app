@@ -32,6 +32,7 @@ interface Archivo {
   email_subida: string | null;
   comentario: string | null;
   visible_empresa: boolean;
+  revisado_en: string | null;
   // Solo PNG/JPG/WEBP. SVG, AI y EPS nunca se muestran: solo se descargan.
   miniatura: string | null;
 }
@@ -51,16 +52,25 @@ function formatearFecha(iso: string) {
 export default function ArchivosPatrocinador({
   patrocinadorId,
   onCambiosFicha,
+  onRevisado,
+  solo,
 }: {
   patrocinadorId: string;
+  // Zona de patrocinadores: "empresa" = solo lo que ha subido la empresa (sin
+  // formulario de subida); "equipo" = documentos para la empresa, con el
+  // botón «Subir documento» (se le asigna sola). Sin indicar: todo, como en la ficha.
+  solo?: "empresa" | "equipo";
+  // Al marcar como revisado algo que subió la empresa (Zona de patrocinadores).
+  onRevisado?: () => void;
   // Al borrar el último logo/ponencia la ficha cambia ("Logo recibido" → No).
   onCambiosFicha?: (cambios: Record<string, string>) => void;
 }) {
-  const [archivos, setArchivos] = useState<Archivo[] | null>(null);
+  const [todos, setArchivos] = useState<Archivo[] | null>(null);
+  const archivos = todos && solo ? todos.filter((a) => a.origen === (solo === "empresa" ? "patrocinador" : "equipo")) : todos;
   const [error, setError] = useState<string | null>(null);
-  const [tipo, setTipo] = useState<TipoArchivo>("logo");
+  const [tipo, setTipo] = useState<TipoArchivo>(solo === "equipo" ? "factura" : "logo");
   const [titulo, setTitulo] = useState("");
-  const [visibleEmpresa, setVisibleEmpresa] = useState(false);
+  const [visibleEmpresa, setVisibleEmpresa] = useState(solo === "equipo");
   const [archivo, setArchivo] = useState<File | null>(null);
   const [subiendo, setSubiendo] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -113,7 +123,7 @@ export default function ArchivosPatrocinador({
         visible_empresa: visibleEmpresa,
       });
       setTitulo("");
-      setVisibleEmpresa(false);
+      setVisibleEmpresa(solo === "equipo");
       setArchivo(null);
       if (inputRef.current) inputRef.current.value = "";
       await cargar();
@@ -154,6 +164,23 @@ export default function ArchivosPatrocinador({
     if (data.cambiosFicha && Object.keys(data.cambiosFicha).length > 0) onCambiosFicha?.(data.cambiosFicha);
   }
 
+  async function marcarRevisado(a: Archivo) {
+    setError(null);
+    try {
+      const res = await fetch("/api/patrocinadores/archivos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...(await cabeceraAutorizacion()) },
+        body: JSON.stringify({ id: a.id, revisado: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "No se pudo guardar.");
+      setArchivos((prev) => prev?.map((x) => (x.id === a.id ? { ...x, revisado_en: new Date().toISOString() } : x)) ?? null);
+      onRevisado?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error inesperado.");
+    }
+  }
+
   async function cambiarVisible(a: Archivo, visible: boolean) {
     setError(null);
     try {
@@ -172,13 +199,18 @@ export default function ArchivosPatrocinador({
 
   return (
     <section className="rounded-lg border border-[var(--borde)] bg-white p-4">
-      <h3 className="seccion-titulo">Archivos</h3>
+      <h3 className="seccion-titulo">
+        {solo === "empresa" ? "Lo que ha subido la empresa" : solo === "equipo" ? "Documentos para la empresa" : "Archivos"}
+      </h3>
       <p className="mb-4 text-xs text-zinc-500">
-        Logo, contrato firmado, factura, ponencia y otros archivos. Lo que subas aquí solo lo ve la
-        empresa en su área de cliente si marcas &quot;Visible para la empresa&quot;. Lo que sube la
-        empresa desde su área aparece con la etiqueta &quot;Subido por la empresa&quot;.
+        {solo === "empresa"
+          ? "Logos, presentaciones y diseños que ha subido la empresa desde su zona. Márcalos como revisados cuando los hayas visto."
+          : solo === "equipo"
+          ? "Factura, contrato o cualquier documento para esta empresa: se le asigna solo. Lo ve en su zona si está marcado como visible."
+          : "Logo, contrato firmado, factura, ponencia y otros archivos. Lo que subas aquí solo lo ve la empresa en su área de cliente si marcas \"Visible para la empresa\". Lo que sube la empresa desde su área aparece con la etiqueta \"Subido por la empresa\"."}
       </p>
 
+      {solo !== "empresa" && (
       <form onSubmit={subir} className="mb-5 grid gap-3 sm:grid-cols-[10rem_1fr]">
         <label className="campo-label sm:pt-2" htmlFor="archivo-tipo">
           Tipo
@@ -237,10 +269,11 @@ export default function ArchivosPatrocinador({
             className="rounded-md px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
             style={{ background: "var(--balvert-azul-oscuro)" }}
           >
-            {subiendo ? "Subiendo…" : "Subir archivo"}
+            {subiendo ? "Subiendo…" : solo === "equipo" ? "Subir documento" : "Subir archivo"}
           </button>
         </div>
       </form>
+      )}
 
       {error && (
         <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
@@ -279,6 +312,20 @@ export default function ArchivosPatrocinador({
                     <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
                       Subido por la empresa — {a.email_subida ?? "portal"}
                     </span>
+                    {a.revisado_en ? (
+                      <span className="ml-2 text-xs text-green-700">✓ Revisado</span>
+                    ) : (
+                      <>
+                        <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">Nuevo, sin revisar</span>
+                        <button
+                          type="button"
+                          onClick={() => marcarRevisado(a)}
+                          className="ml-2 text-xs font-medium text-[var(--balvert-azul-oscuro)] underline"
+                        >
+                          Marcar como revisado
+                        </button>
+                      </>
+                    )}
                   </p>
                 )}
                 {a.comentario && (

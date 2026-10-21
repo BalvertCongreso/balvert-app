@@ -28,7 +28,7 @@ export async function GET(req: Request) {
   const supabase = crearClienteServicio();
   const { data, error } = await supabase
     .from("patrocinador_archivos")
-    .select("id, tipo, titulo, nombre_archivo, ruta_archivo, autor, creado, origen, email_subida, comentario, visible_empresa")
+    .select("id, tipo, titulo, nombre_archivo, ruta_archivo, autor, creado, origen, email_subida, comentario, visible_empresa, revisado_en")
     .eq("patrocinador_id", patrocinadorId)
     .order("creado", { ascending: false });
   if (error) {
@@ -101,11 +101,23 @@ export async function POST(req: Request) {
 }
 
 // "Visible para la empresa en su área": solo en los archivos del equipo (lo
-// que sube la empresa ya lo ve ella siempre).
+// que sube la empresa ya lo ve ella siempre). "Revisado": solo en lo que sube
+// la empresa (deja de salir como material nuevo en la Zona de patrocinadores).
 export async function PATCH(req: Request) {
   if (!(await usuarioDesdeCabecera(req.headers.get("authorization")))) return sinSesion();
   const body = await req.json().catch(() => null);
   const id = typeof body?.id === "string" ? body.id : "";
+  if (id && typeof body?.revisado === "boolean") {
+    const { data, error } = await crearClienteServicio()
+      .from("patrocinador_archivos")
+      .update({ revisado_en: body.revisado ? new Date().toISOString() : null })
+      .eq("id", id)
+      .eq("origen", "patrocinador")
+      .select("id");
+    if (error) return NextResponse.json({ error: "No se pudo guardar: " + error.message }, { status: 500 });
+    if (!data || data.length === 0) return NextResponse.json({ error: "Archivo no encontrado." }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  }
   if (!id || typeof body?.visible_empresa !== "boolean") {
     return NextResponse.json({ error: "Datos no válidos." }, { status: 400 });
   }
