@@ -4,9 +4,9 @@ import { ORIGEN_PUBLICO } from "@/lib/dominio";
 
 // Marco de las dos zonas del portal (/portal/inicio y /portal/empresa), según
 // la maqueta aprobada (Maqueta_Portal_Balvert.html): cabecera azul con saludo,
-// lugar, días y cuenta atrás, «Comprar entradas» y «Salir»; menú lateral en
-// escritorio y pestañas deslizables en móvil (por debajo de 760 px). Las
-// pantallas de entrar siguen con PortalMarco.
+// lugar, días y cuenta atrás, «Comprar entradas» y «Salir»; debajo, la fila de
+// pestañas (fija arriba al bajar, deslizable si no caben). Las pantallas de
+// entrar siguen con PortalMarco.
 
 export interface CongresoCabecera {
   lugar: string | null;
@@ -125,16 +125,16 @@ export default function PortalZona<T extends string>({
         </div>
       </header>
 
-      <div
-        className={`mx-auto grid w-full max-w-[1240px] flex-1 gap-3.5 p-3.5 min-[760px]:gap-6 min-[760px]:p-6 ${
-          pestanas.length > 1 ? "min-[760px]:grid-cols-[230px_minmax(0,1fr)]" : ""
-        }`}
-      >
-        {pestanas.length > 1 ? (
-          <nav
-            aria-label="Secciones"
-            className="-mx-3.5 flex gap-1.5 overflow-x-auto px-3.5 pb-1 min-[760px]:sticky min-[760px]:top-4 min-[760px]:mx-0 min-[760px]:flex-col min-[760px]:gap-1 min-[760px]:self-start min-[760px]:overflow-visible min-[760px]:px-0"
-          >
+      {pestanas.length > 1 && (
+        // Fila de pestañas bajo la cabecera, fija arriba al bajar (debajo de la
+        // franja de «Ver como la empresa» si la hay: --alto-franja). Si no
+        // caben, se deslizan en horizontal.
+        <nav
+          aria-label="Secciones"
+          className="sticky z-40 border-b border-[#e3e8ec] bg-[#f3f6f8]/95 backdrop-blur"
+          style={{ top: "var(--alto-franja, 0px)" }}
+        >
+          <div className="mx-auto flex w-full max-w-[1240px] gap-1.5 overflow-x-auto px-3.5 py-2.5 min-[760px]:px-6">
             {pestanas.map(({ id, titulo, insignia }) => {
               const on = id === activa;
               return (
@@ -143,12 +143,12 @@ export default function PortalZona<T extends string>({
                   type="button"
                   onClick={() => onIr(id)}
                   aria-current={on ? "page" : undefined}
-                  // En móvil la fila se desliza: que la pestaña abierta quede a la vista.
+                  // Que la pestaña abierta quede a la vista en la fila.
                   ref={on ? (el) => el?.scrollIntoView({ block: "nearest", inline: "nearest" }) : undefined}
-                  className={`flex min-h-11 shrink-0 items-center justify-between gap-2 whitespace-nowrap rounded-[10px] border px-3 py-2 text-left text-sm min-[760px]:border-transparent min-[760px]:py-2.5 ${
+                  className={`flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-[10px] border px-3 py-2 text-sm ${
                     on
-                      ? "border-[var(--balvert-azul-oscuro)] bg-[var(--balvert-azul-oscuro)] font-bold text-white min-[760px]:bg-white min-[760px]:text-[var(--balvert-azul-oscuro)] min-[760px]:shadow-sm"
-                      : "border-[var(--borde)] bg-white text-[#1f2a33] min-[760px]:bg-transparent min-[760px]:hover:bg-[#e7eef3]"
+                      ? "border-[var(--balvert-azul-oscuro)] bg-[var(--balvert-azul-oscuro)] font-bold text-white"
+                      : "border-[var(--borde)] bg-white text-[#1f2a33] hover:bg-[#e7eef3]"
                   }`}
                 >
                   {titulo}
@@ -160,10 +160,11 @@ export default function PortalZona<T extends string>({
                 </button>
               );
             })}
-          </nav>
-        ) : null}
-        <div className="flex min-w-0 flex-col gap-4">{children}</div>
-      </div>
+          </div>
+        </nav>
+      )}
+
+      <div className="mx-auto flex w-full min-w-0 max-w-[1240px] flex-1 flex-col gap-4 p-3.5 min-[760px]:p-6">{children}</div>
     </div>
   );
 }

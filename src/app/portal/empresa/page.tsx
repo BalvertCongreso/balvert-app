@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import PortalMarco from "@/components/PortalMarco";
 import PortalZona, { ContactoZona, EtiquetaEstado, Tarjeta, type CongresoCabecera, type PestanaZona } from "@/components/PortalZona";
@@ -244,27 +244,7 @@ function ZonaEmpresa() {
   return (
     <>
       {datos.modoOrganizacion && (
-        <>
-          <div
-            role="status"
-            className="fixed inset-x-0 top-0 z-50 flex flex-wrap items-center justify-center gap-3 bg-amber-100 px-4 py-2 text-center text-sm text-amber-900 shadow"
-          >
-            <span>
-              Estás viendo la zona de <strong>{datos.empresa ?? "la empresa"}</strong> como organización. Lo que cambies
-              quedará a tu nombre.
-            </span>
-            <button
-              type="button"
-              onClick={salirOrganizacion}
-              disabled={saliendo}
-              className="min-h-9 rounded-md border border-amber-400 bg-white px-3 py-1 font-semibold hover:bg-amber-50 disabled:opacity-60"
-            >
-              Salir
-            </button>
-          </div>
-          {/* Hueco para que la franja no tape la cabecera. */}
-          <div className="h-16 bg-amber-100 sm:h-12" />
-        </>
+        <FranjaOrganizacion empresa={datos.empresa} onSalir={salirOrganizacion} saliendo={saliendo} />
       )}
       <PortalZona
         subtitulo={`Zona de patrocinadores${datos.edicionNombre ? ` — ${datos.edicionNombre}` : ""}`}
@@ -350,6 +330,54 @@ function ZonaEmpresa() {
         <ContactoZona />
       </PortalZona>
     </>
+  );
+}
+
+// Franja de «Ver como la empresa»: en el flujo de la página (sin hueco
+// debajo) y fija arriba al bajar. Publica su alto en --alto-franja para que
+// la fila de pestañas se quede justo debajo.
+function FranjaOrganizacion({
+  empresa,
+  onSalir,
+  saliendo,
+}: {
+  empresa: string | null;
+  onSalir: () => void;
+  saliendo: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const raiz = document.documentElement;
+    const medir = () => raiz.style.setProperty("--alto-franja", `${el.offsetHeight}px`);
+    medir();
+    const obs = new ResizeObserver(medir);
+    obs.observe(el);
+    return () => {
+      obs.disconnect();
+      raiz.style.removeProperty("--alto-franja");
+    };
+  }, []);
+  return (
+    <div
+      ref={ref}
+      role="status"
+      className="sticky top-0 z-50 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 bg-amber-100 px-4 py-2 text-center text-sm text-amber-900 shadow"
+    >
+      <span>
+        Estás viendo la zona de <strong>{empresa ?? "la empresa"}</strong> como organización. Lo que cambies quedará a tu
+        nombre.
+      </span>
+      <button
+        type="button"
+        onClick={onSalir}
+        disabled={saliendo}
+        className="min-h-9 rounded-md border border-amber-400 bg-white px-3 py-1 font-semibold hover:bg-amber-50 disabled:opacity-60"
+      >
+        Salir
+      </button>
+    </div>
   );
 }
 

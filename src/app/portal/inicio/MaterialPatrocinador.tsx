@@ -403,7 +403,7 @@ export function SeccionProduccion({ e, onGuardado }: { e: EmpresaMaterial; onGua
             type="button"
             onClick={guardar}
             disabled={!hayCambios || guardando}
-            className="min-h-11 rounded-[10px] bg-[var(--balvert-marron-claro)] px-4 text-sm font-bold text-[#2b1f00] disabled:cursor-not-allowed disabled:opacity-45"
+            className="min-h-11 rounded-[10px] bg-[var(--balvert-marron-claro)] px-4 text-sm font-bold text-[#2b1f00] disabled:cursor-not-allowed disabled:bg-[#d5dde3] disabled:text-[#3a4a55]"
           >
             {guardando ? "Guardando…" : "Guardar cambios"}
           </button>
