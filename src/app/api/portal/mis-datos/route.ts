@@ -154,12 +154,12 @@ export async function GET() {
     }
   }
 
-  let documentos: { id: string; titulo: string; descripcion: string | null; nombre_archivo: string }[] = [];
+  let documentos: { id: string; titulo: string; descripcion: string | null; nombre_archivo: string; destino: string; creado: string }[] = [];
   if (edicionId) {
     try {
       // Sin ruta_archivo: la descarga va siempre por /api/portal/documento.
       documentos = (await documentosVisibles(supabase, edicionId, sesion.email)).map(
-        ({ id, titulo, descripcion, nombre_archivo }) => ({ id, titulo, descripcion, nombre_archivo })
+        ({ id, titulo, descripcion, nombre_archivo, destino, creado }) => ({ id, titulo, descripcion, nombre_archivo, destino, creado })
       );
     } catch (e) {
       console.error("portal/mis-datos:", e instanceof Error ? e.message : e);

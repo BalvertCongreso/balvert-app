@@ -1206,36 +1206,3 @@ function DatosPonente({
     </Bloque>
   );
 }
-
-// ---- Pestaña "Documentos": lo que el equipo comparte con cada empresa ----
-
-export function DocumentosOrganizacion({ empresas }: { empresas: EmpresaMaterial[] }) {
-  const conDocumentos = empresas.filter((e) => e.organizacion.length > 0);
-  if (conDocumentos.length === 0) return null;
-  return (
-    <div className="flex flex-col gap-4">
-      {conDocumentos.map((e) => (
-        <Bloque key={e.id} titulo={`Documentos para ${e.empresa ?? "tu empresa"}`}>
-          <ul className="flex flex-col divide-y divide-[var(--borde)]">
-            {e.organizacion.map((a) => (
-              <li key={a.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0 text-sm">
-                  <p className="break-words font-medium text-zinc-800">{a.titulo || a.nombre}</p>
-                  <p className="text-xs text-zinc-500">
-                    {NOMBRE_TIPO_ARCHIVO[a.tipo]} · {fecha(a.creado)}
-                  </p>
-                </div>
-                <a
-                  href={`/api/portal/materiales/descargar?id=${encodeURIComponent(a.id)}`}
-                  className={`${botonSecundario} shrink-0 self-start sm:self-auto`}
-                >
-                  Descargar
-                </a>
-              </li>
-            ))}
-          </ul>
-        </Bloque>
-      ))}
-    </div>
-  );
-}

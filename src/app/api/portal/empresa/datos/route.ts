@@ -79,7 +79,7 @@ export async function GET() {
   ]);
   if (!ficha) return NextResponse.json({ error: "Sesión no encontrada." }, { status: 401 });
 
-  let documentos: { id: string; titulo: string; descripcion: string | null; nombre_archivo: string }[] = [];
+  let documentos: { id: string; titulo: string; descripcion: string | null; nombre_archivo: string; destino: string; creado: string }[] = [];
   let resumen: { pasos: PasoResumen[]; invitados: EstadoPatrocinador["invitados"]; ponencia: EstadoPatrocinador["ponencia"] } | null =
     null;
   if (edicionId && ficha.edicion_id === edicionId) {
@@ -89,7 +89,14 @@ export async function GET() {
         documentosEmpresa(supabase, edicionId, sesion.patrocinadorId),
         estadoPatrocinadores(supabase, edicionId, sesion.patrocinadorId),
       ]);
-      documentos = docs.map(({ id, titulo, descripcion, nombre_archivo }) => ({ id, titulo, descripcion, nombre_archivo }));
+      documentos = docs.map(({ id, titulo, descripcion, nombre_archivo, destino, creado }) => ({
+        id,
+        titulo,
+        descripcion,
+        nombre_archivo,
+        destino,
+        creado,
+      }));
       const estado = estados[0];
       if (estado) resumen = { pasos: pasosResumen(estado), invitados: estado.invitados, ponencia: estado.ponencia };
     } catch (e) {

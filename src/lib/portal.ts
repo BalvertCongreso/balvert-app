@@ -173,6 +173,8 @@ export interface DocumentoPortal {
   descripcion: string | null;
   nombre_archivo: string;
   ruta_archivo: string;
+  destino: string;
+  creado: string;
 }
 
 // Documentos de la edición activa que le corresponden a este email (zona
@@ -212,7 +214,7 @@ export async function documentosEmpresa(
 async function consultarDocumentos(supabase: SupabaseClient, edicionId: string, filtros: string[]) {
   const { data, error } = await supabase
     .from("documentos")
-    .select("id, titulo, descripcion, nombre_archivo, ruta_archivo")
+    .select("id, titulo, descripcion, nombre_archivo, ruta_archivo, destino, creado")
     .eq("edicion_id", edicionId)
     .or(filtros.join(","))
     .order("creado", { ascending: false });

@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import PortalMarco from "@/components/PortalMarco";
 import PortalZona, { ContactoZona, EtiquetaEstado, Tarjeta, type CongresoCabecera } from "@/components/PortalZona";
+import DocumentosPortal, { type DocumentoTarjeta } from "@/components/DocumentosPortal";
 import { ORIGEN_PUBLICO } from "@/lib/dominio";
 import { Aviso } from "./MaterialPatrocinador";
 import { CAMPOS_FACTURACION, type DatosFacturacion } from "@/lib/factura";
@@ -52,7 +53,19 @@ interface DocumentoPortal {
   titulo: string;
   descripcion: string | null;
   nombre_archivo: string;
+  destino: string;
+  creado: string;
 }
+
+const tarjetaDocumento = (d: DocumentoPortal): DocumentoTarjeta => ({
+  id: d.id,
+  titulo: d.titulo,
+  descripcion: d.descripcion,
+  nombreArchivo: d.nombre_archivo,
+  tipo: "Documento",
+  creado: d.creado,
+  href: `/api/portal/documento?id=${encodeURIComponent(d.id)}`,
+});
 
 interface DatosPortal {
   email: string;
@@ -660,35 +673,12 @@ function AreaCliente() {
       )}
 
       {pestana === "documentos" && (
-        <>
-          {!tieneDocumentos && (
-            <Aviso tipo="info">
-              Todavía no hay documentos para ti. Cuando la organización comparta alguno (por ejemplo, tu factura), aparecerá
-              aquí y te avisaremos por email.
-            </Aviso>
-          )}
-          {datos.documentos.length > 0 && (
-            <ul className="grid gap-4 min-[1000px]:grid-cols-2">
-              {datos.documentos.map((d) => (
-                <li
-                  key={d.id}
-                  className="flex flex-col gap-3 rounded-[14px] border border-[#e3e8ec] bg-white p-5 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0 text-sm">
-                    <p className="font-semibold text-zinc-800">{d.titulo}</p>
-                    {d.descripcion && <p className="whitespace-pre-line text-[#5d6b76]">{d.descripcion}</p>}
-                  </div>
-                  <a
-                    href={`/api/portal/documento?id=${encodeURIComponent(d.id)}`}
-                    className="inline-flex min-h-11 shrink-0 items-center self-start rounded-[9px] bg-[#eef4f8] px-4 py-2 text-sm font-bold text-[var(--balvert-azul-oscuro)] hover:bg-[#e2edf4] sm:self-auto"
-                  >
-                    Descargar
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
+        <DocumentosPortal
+          secciones={[
+            { titulo: "Para ti", documentos: datos.documentos.filter((d) => d.destino !== "todos_asistentes").map(tarjetaDocumento) },
+            { titulo: "Para todos los asistentes", documentos: datos.documentos.filter((d) => d.destino === "todos_asistentes").map(tarjetaDocumento) },
+          ]}
+        />
       )}
 
       <ContactoZona />

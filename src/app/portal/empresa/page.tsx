@@ -6,7 +6,6 @@ import PortalMarco from "@/components/PortalMarco";
 import PortalZona, { ContactoZona, EtiquetaEstado, Tarjeta, type CongresoCabecera, type PestanaZona } from "@/components/PortalZona";
 import {
   Aviso,
-  DocumentosOrganizacion,
   SeccionMaterial,
   SeccionPatrocinio,
   SeccionPonencia,
@@ -17,6 +16,18 @@ import {
   type EmpresaMaterial,
 } from "../inicio/MaterialPatrocinador";
 import { DatosEmpresa, InvitacionesEmpresa } from "./SeccionesEmpresa";
+import DocumentosPortal, { type DocumentoTarjeta } from "@/components/DocumentosPortal";
+import { NOMBRE_TIPO_ARCHIVO } from "@/lib/patrocinadorArchivos";
+
+const tarjetaDocumento = (d: DatosEmpresa["documentos"][number]): DocumentoTarjeta => ({
+  id: d.id,
+  titulo: d.titulo,
+  descripcion: d.descripcion,
+  nombreArchivo: d.nombre_archivo,
+  tipo: "Documento",
+  creado: d.creado,
+  href: `/api/portal/empresa/documento?id=${encodeURIComponent(d.id)}`,
+});
 
 // Zona de empresa del portal: se entra con el usuario y la contraseña de la
 // empresa (ver src/lib/portalEmpresa.ts). Todo lo que se lee y guarda aquí
@@ -53,7 +64,7 @@ interface DatosEmpresa {
   // «Ver como la empresa» desde el panel (sesión de la organización).
   modoOrganizacion: boolean;
   organizador: string | null;
-  documentos: { id: string; titulo: string; descripcion: string | null; nombre_archivo: string }[];
+  documentos: { id: string; titulo: string; descripcion: string | null; nombre_archivo: string; destino: string; creado: string }[];
   resumen: {
     pasos: PasoResumen[];
     invitados: { asignados: number; incluidos: number };
@@ -287,36 +298,32 @@ function ZonaEmpresa() {
         )}
 
         {pestana === "documentos" && (
-          <>
-            {datos.documentos.length === 0 && (!empresa || empresa.organizacion.length === 0) && (
-              <Aviso tipo="info">
-                Todavía no hay documentos para tu empresa. Cuando la organización comparta alguno (por ejemplo, vuestra
-                factura), aparecerá aquí.
-              </Aviso>
-            )}
-            {datos.documentos.length > 0 && (
-              <ul className="grid gap-4 min-[1000px]:grid-cols-2">
-                {datos.documentos.map((d) => (
-                  <li
-                    key={d.id}
-                    className="flex flex-col gap-3 rounded-[14px] border border-[#e3e8ec] bg-white p-5 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="min-w-0 text-sm">
-                      <p className="font-semibold text-zinc-800">{d.titulo}</p>
-                      {d.descripcion && <p className="whitespace-pre-line text-[#5d6b76]">{d.descripcion}</p>}
-                    </div>
-                    <a
-                      href={`/api/portal/empresa/documento?id=${encodeURIComponent(d.id)}`}
-                      className="inline-flex min-h-11 shrink-0 items-center self-start rounded-[9px] bg-[#eef4f8] px-4 py-2 text-sm font-bold text-[var(--balvert-azul-oscuro)] hover:bg-[#e2edf4] sm:self-auto"
-                    >
-                      Descargar
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {empresa && <DocumentosOrganizacion empresas={[empresa]} />}
-          </>
+          <DocumentosPortal
+            secciones={[
+              {
+                titulo: "Para vuestra empresa",
+                documentos: [
+                  ...datos.documentos.filter((d) => d.destino !== "todos_patrocinadores").map(tarjetaDocumento),
+                  // Lo que el equipo sube en la ficha de la empresa (factura, contrato…).
+                  ...(empresa?.organizacion ?? []).map(
+                    (a): DocumentoTarjeta => ({
+                      id: a.id,
+                      titulo: a.titulo || a.nombre,
+                      descripcion: null,
+                      nombreArchivo: a.nombre,
+                      tipo: NOMBRE_TIPO_ARCHIVO[a.tipo],
+                      creado: a.creado,
+                      href: `/api/portal/materiales/descargar?id=${encodeURIComponent(a.id)}`,
+                    })
+                  ),
+                ],
+              },
+              {
+                titulo: "Para todos los patrocinadores",
+                documentos: datos.documentos.filter((d) => d.destino === "todos_patrocinadores").map(tarjetaDocumento),
+              },
+            ]}
+          />
         )}
 
         {pestana === "invitaciones" && <InvitacionesEmpresa />}
