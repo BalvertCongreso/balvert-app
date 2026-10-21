@@ -55,3 +55,17 @@ export const AYUDA_DOCUMENTO: Record<TipoDocumento, string> = {
 export function nombreTieneApellidos(nombre: string): boolean {
   return nombre.trim().split(/\s+/).filter(Boolean).length >= 2;
 }
+
+// Sin elegir el tipo (alta de invitados): 8 números + letra se trata como DNI,
+// X/Y/Z + 7 números + letra como NIE (las dos con la letra comprobada) y lo
+// demás como pasaporte. Devuelve el documento normalizado o null.
+export function validarDocumentoSinTipo(valor: string): string | null {
+  const doc = normalizarDocumento(valor);
+  if (/^\d{8}[A-Z]$/.test(doc)) return validarDocumento(doc, "DNI");
+  if (/^[XYZ]\d{7}[A-Z]$/.test(doc)) return validarDocumento(doc, "NIE");
+  if (/^\d{7,8}$/.test(doc) || /^[XYZ]\d{7}$/.test(doc)) return null; // DNI/NIE sin letra
+  return validarDocumento(doc, "Pasaporte");
+}
+
+export const AYUDA_DOCUMENTO_SIN_TIPO =
+  "Revisa el documento: un DNI son 8 números y una letra (la correcta), un NIE es X, Y o Z, 7 números y una letra, y un pasaporte tiene entre 5 y 20 letras o números.";

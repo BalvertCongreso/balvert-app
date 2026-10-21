@@ -37,6 +37,9 @@ interface Props {
   // borrar el último logo pone "Logo recibido" en No): se copian al formulario
   // para que "Guardar cambios" no los vuelva a dejar como estaban.
   cambiosExternos?: Record<string, string>;
+  // Avisa de cada cambio (el alta lo usa para la categoría y el nº de
+  // invitaciones del bloque de invitados).
+  onValoresCambio?: (valores: Record<string, string>) => void;
 }
 
 export default function PatrocinadorForm({
@@ -46,6 +49,7 @@ export default function PatrocinadorForm({
   textoBoton,
   historialEmail,
   cambiosExternos,
+  onValoresCambio,
 }: Props) {
   const [valores, setValores] = useState<Record<string, string>>(() => {
     const base = valoresIniciales();
@@ -65,7 +69,9 @@ export default function PatrocinadorForm({
   }
 
   function actualizar(key: string, value: string) {
-    setValores((prev) => ({ ...prev, [key]: value }));
+    const nuevos = { ...valores, [key]: value };
+    setValores(nuevos);
+    onValoresCambio?.(nuevos);
   }
 
   function handleSubmit(e: React.FormEvent) {

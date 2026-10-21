@@ -174,7 +174,7 @@ export default function ArchivosPatrocinador({
     <section className="rounded-lg border border-[var(--borde)] bg-white p-4">
       <h3 className="seccion-titulo">Archivos</h3>
       <p className="mb-4 text-xs text-zinc-500">
-        Logo, contrato firmado, ponencia y otros archivos. Lo que subas aquí solo lo ve la
+        Logo, contrato firmado, factura, ponencia y otros archivos. Lo que subas aquí solo lo ve la
         empresa en su área de cliente si marcas &quot;Visible para la empresa&quot;. Lo que sube la
         empresa desde su área aparece con la etiqueta &quot;Subido por la empresa&quot;.
       </p>
@@ -187,7 +187,12 @@ export default function ArchivosPatrocinador({
           id="archivo-tipo"
           className="campo-input max-w-xs"
           value={tipo}
-          onChange={(e) => setTipo(e.target.value as TipoArchivo)}
+          onChange={(e) => {
+            const nuevo = e.target.value as TipoArchivo;
+            setTipo(nuevo);
+            // Una factura casi siempre es para que la vea la empresa (se puede desmarcar).
+            if (nuevo === "factura") setVisibleEmpresa(true);
+          }}
         >
           {TIPOS_ARCHIVO.map((t) => (
             <option key={t} value={t}>

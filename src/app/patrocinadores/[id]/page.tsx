@@ -9,7 +9,7 @@ import { seccionesPatrocinador } from "@/lib/patrocinadorFields";
 import { supabase } from "@/lib/supabaseClient";
 import { eliminarPatrocinador } from "@/lib/apiCliente";
 import PatrocinadorForm from "@/components/PatrocinadorForm";
-import CrearInvitaciones from "@/components/CrearInvitaciones";
+import InvitadosPatrocinador from "@/components/InvitadosPatrocinador";
 import type { Patrocinador, PatrocinadorInput } from "@/types/database";
 
 export default function EditarPatrocinadorPage() {
@@ -96,12 +96,7 @@ export default function EditarPatrocinadorPage() {
 
       {!cargando && patrocinador && (
         <>
-          <CrearInvitaciones
-            patrocinadorId={patrocinador.id}
-            edicionId={patrocinador.edicion_id}
-            categoria={patrocinador.categoria}
-            numInvitacionesIncluidas={patrocinador.num_invitaciones_incluidas}
-          />
+          <InvitadosPatrocinador patrocinadorId={patrocinador.id} />
           <PatrocinadorForm
             historialEmail={{ tabla: "patrocinadores", edicionId: patrocinador.edicion_id, registroId: patrocinador.id }}
             valoresPrevios={patrocinador as unknown as Record<string, string | number | null>}

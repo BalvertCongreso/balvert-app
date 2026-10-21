@@ -53,8 +53,9 @@ export const seccionesPatrocinador: SeccionDef[] = [
     titulo: "Invitaciones",
     campos: [
       { key: "num_invitaciones_incluidas", label: "Nº invitaciones incluidas", tipo: "numero" },
-      { key: "nombres_invitados", label: "Nombres de los invitados", tipo: "texto-largo" },
-      { key: "emails_invitados", label: "Emails de los invitados", tipo: "texto-largo" },
+      // "Nombres/Emails de los invitados" (texto libre) ya no se enseñan: los
+      // invitados se añaden uno a uno en el bloque Invitaciones de la ficha.
+      // Las columnas siguen en la base de datos.
       {
         key: "invitaciones_enviadas",
         label: "Invitaciones enviadas",

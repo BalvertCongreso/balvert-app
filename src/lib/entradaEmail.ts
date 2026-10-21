@@ -22,7 +22,11 @@ function construirEmailHtml(nombre: string | null, evento: string) {
   `;
 }
 
-function construirEmailHtmlMultiple(entradas: EntradaParaEmail[], origen: string | null) {
+function escaparHtml(texto: string) {
+  return texto.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function construirEmailHtmlMultiple(entradas: EntradaParaEmail[], origen: string | null, invitadoPor: string | null) {
   const bloques = entradas
     .map(
       (e, i) => `
@@ -39,10 +43,20 @@ function construirEmailHtmlMultiple(entradas: EntradaParaEmail[], origen: string
   <div style="font-family: -apple-system, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; color: #1f2937;">
     <h1 style="color: #8B6914; font-size: 20px; margin-bottom: 4px;">BALVERT 2027</h1>
     <p style="color: #5BB8E8; font-weight: 600; margin-top: 0;">Tus entradas</p>
-    <p>Hola,</p>
-    <p>Aquí tienes ${entradas.length === 1 ? "tu entrada" : "tus entradas"} para BALVERT 2027. Presenta cada una (en el móvil o impresa) en el acceso correspondiente; se validará escaneando el código.</p>
+    <p>Hola${invitadoPor && entradas[0]?.datos.nombreAsistente ? ` ${escaparHtml(entradas[0].datos.nombreAsistente)}` : ""},</p>
+    ${
+      invitadoPor
+        ? `<p>${escaparHtml(invitadoPor)} te invita a BALVERT 2027. Aquí tienes ${entradas.length === 1 ? "tu entrada" : "tus entradas"}: presenta cada una (en el móvil o impresa) en el acceso correspondiente; se validará escaneando el código.</p>`
+        : `<p>Aquí tienes ${entradas.length === 1 ? "tu entrada" : "tus entradas"} para BALVERT 2027. Presenta cada una (en el móvil o impresa) en el acceso correspondiente; se validará escaneando el código.</p>`
+    }
     ${bloques}
-    ${origen ? `<p style="font-size: 14px;">En tu <a href="${origen}/portal" style="color: #2f7ea8;">área de cliente</a> tienes tus entradas, el recibo del pago y puedes pedir factura: entra con este mismo email.</p>` : ""}
+    ${
+      origen && invitadoPor
+        ? `<p style="font-size: 14px;">En tu <a href="${origen}/portal" style="color: #2f7ea8;">área personal</a> tienes tus entradas, los documentos para asistentes y, después del congreso, tu certificado de asistencia: entra con este mismo email.</p>`
+        : origen
+        ? `<p style="font-size: 14px;">En tu <a href="${origen}/portal" style="color: #2f7ea8;">área de cliente</a> tienes tus entradas, el recibo del pago y puedes pedir factura: entra con este mismo email.</p>`
+        : ""
+    }
     <p style="font-size: 13px; color: #6b7280;">Si tienes cualquier duda, responde a este email.</p>
   </div>
   `;
@@ -105,11 +119,13 @@ export async function enviarEmailConEntrada(
 // Excursión). Se manda UN solo email al comprador con todas las imágenes
 // adjuntas, en vez de un email por entrada.
 // origen: dirección de la app para el enlace al área de cliente (sin él, el
-// email no lo incluye).
+// email no lo incluye). invitadoPor: nombre de la empresa patrocinadora
+// cuando son entradas de invitado (cambia el texto: no hay compra ni recibo).
 export async function enviarEmailConVariasEntradas(
   email: string,
   entradas: EntradaParaEmail[],
-  origen: string | null = null
+  origen: string | null = null,
+  invitadoPor: string | null = null
 ): Promise<ResultadoEnvio> {
   if (!process.env.RESEND_API_KEY) {
     return { enviado: false, error: "Falta RESEND_API_KEY en el servidor (.env.local)." };
@@ -125,7 +141,7 @@ export async function enviarEmailConVariasEntradas(
       from: "BALVERT 2027 <secretaria@balvert.es>",
       to: email,
       subject: entradas.length === 1 ? `Tu entrada — ${entradas[0].datos.evento} BALVERT 2027` : "Tus entradas — BALVERT 2027",
-      html: construirEmailHtmlMultiple(entradas, origen),
+      html: construirEmailHtmlMultiple(entradas, origen, invitadoPor),
       attachments: entradas.map((e, i) => ({
         filename: `entrada-${e.tabla}-${e.qrCodigo}.png`,
         content: imagenes[i],

@@ -35,7 +35,7 @@ export const MENSAJE_DEMASIADO_GRANDE =
 // página (un SVG puede llevar código): solo se descargan.
 export const EXTENSIONES_CON_MINIATURA = new Set(["png", "jpg", "jpeg", "webp"]);
 
-export const TIPOS_ARCHIVO = ["logo", "ponencia", "rollup", "vinilado", "contrato", "otro"] as const;
+export const TIPOS_ARCHIVO = ["logo", "ponencia", "rollup", "vinilado", "contrato", "factura", "otro"] as const;
 export type TipoArchivo = (typeof TIPOS_ARCHIVO)[number];
 export const NOMBRE_TIPO_ARCHIVO: Record<TipoArchivo, string> = {
   logo: "Logo",
@@ -43,6 +43,7 @@ export const NOMBRE_TIPO_ARCHIVO: Record<TipoArchivo, string> = {
   rollup: "Rollup",
   vinilado: "Vinilado",
   contrato: "Contrato",
+  factura: "Factura",
   otro: "Otro",
 };
 export function esTipoArchivo(valor: unknown): valor is TipoArchivo {

@@ -30,6 +30,8 @@ const ETIQUETAS_EXTRA: Record<string, string> = {
   check_in_hecho: "Check-in hecho",
   check_in_fecha: "Fecha y hora del check-in",
   recibo_url: "Recibo de pago (enlace)",
+  nombres_invitados: "Nombres de los invitados (antiguo)",
+  emails_invitados: "Emails de los invitados (antiguo)",
 };
 // Internos: no se enseñan (qr_codigo ni siquiera se guarda).
 const OCULTOS = new Set(["id", "edicion_id", "qr_codigo"]);

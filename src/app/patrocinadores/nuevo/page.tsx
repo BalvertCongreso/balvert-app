@@ -6,6 +6,8 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { obtenerEdicionActiva } from "@/lib/edicionActiva";
 import PatrocinadorForm from "@/components/PatrocinadorForm";
+import InvitadosPatrocinador, { type InvitadoPendiente } from "@/components/InvitadosPatrocinador";
+import { llamarApiJson } from "@/lib/apiCliente";
 import type { Edicion, PatrocinadorInput } from "@/types/database";
 
 export default function NuevoPatrocinadorPage() {
@@ -13,6 +15,9 @@ export default function NuevoPatrocinadorPage() {
   const [edicion, setEdicion] = useState<Edicion | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [invitados, setInvitados] = useState<InvitadoPendiente[]>([]);
+  const [categoria, setCategoria] = useState<string | null>(null);
+  const [numIncluidas, setNumIncluidas] = useState<number | null>(null);
 
   useEffect(() => {
     obtenerEdicionActiva().then(setEdicion);
@@ -20,15 +25,30 @@ export default function NuevoPatrocinadorPage() {
 
   async function guardar(datos: PatrocinadorInput) {
     setGuardando(true);
-    const { error } = await supabase
+    const { data: creado, error } = await supabase
       .from("patrocinadores")
-      .insert({ ...datos, edicion_id: edicion?.id ?? null });
-    setGuardando(false);
-    if (error) {
-      setError(error.message);
+      .insert({ ...datos, edicion_id: edicion?.id ?? null })
+      .select("id")
+      .single();
+    if (error || !creado) {
+      setGuardando(false);
+      setError(error?.message ?? "No se pudo crear.");
       return;
     }
-    router.push("/patrocinadores");
+    if (invitados.length === 0) {
+      router.push("/patrocinadores");
+      return;
+    }
+    // Los invitados apuntados se guardan (y se les manda la entrada) ahora que
+    // ya hay ficha. Después se abre la ficha para ver cómo ha ido cada uno.
+    for (const inv of invitados) {
+      try {
+        await llamarApiJson("/api/patrocinadores/invitados", { patrocinador_id: creado.id, ...inv });
+      } catch {
+        // El que falle no aparecerá en la lista de la ficha: se vuelve a añadir allí.
+      }
+    }
+    router.push(`/patrocinadores/${creado.id}`);
   }
 
   return (
@@ -56,7 +76,18 @@ export default function NuevoPatrocinadorPage() {
         </div>
       )}
 
+      <InvitadosPatrocinador
+        pendientes={invitados}
+        onPendientes={setInvitados}
+        categoria={categoria}
+        numIncluidas={numIncluidas}
+      />
+
       <PatrocinadorForm
+        onValoresCambio={(v) => {
+          setCategoria(v.categoria || null);
+          setNumIncluidas(v.num_invitaciones_incluidas ? Number(v.num_invitaciones_incluidas) : null);
+        }}
         historialEmail={edicion ? { tabla: "patrocinadores", edicionId: edicion.id, registroId: null } : undefined}
         guardando={guardando}
         onGuardar={guardar}
