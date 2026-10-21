@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import QRCode from "qrcode";
 import { crearClienteServicio } from "@/lib/supabaseServidor";
 import { construirImagenEntrada } from "@/lib/entradaImagen";
 import { NOMBRE_TABLA_SQL, construirDatosEntrada, type Tabla } from "@/lib/entradaDatos";
@@ -19,6 +20,8 @@ export async function GET(req: Request) {
   const tabla = searchParams.get("tabla") as Tabla | null;
   const id = searchParams.get("id");
   const descargar = searchParams.get("descargar") === "1";
+  // Solo el código QR (el ticket de «Mis entradas»), con la misma búsqueda.
+  const soloQr = searchParams.get("qr") === "1";
   if (!tabla || !Object.hasOwn(NOMBRE_TABLA_SQL, tabla) || !id) {
     return NextResponse.json({ error: "Faltan datos (tabla o id)." }, { status: 400 });
   }
@@ -36,6 +39,12 @@ export async function GET(req: Request) {
   if (error || !fila || !fila.qr_codigo) return noEncontrada;
 
   const datos = await construirDatosEntrada(supabase, tabla, fila);
+  if (soloQr) {
+    const qr = await QRCode.toBuffer(datos.qrPayload, { width: 300, margin: 1 });
+    return new NextResponse(new Uint8Array(qr), {
+      headers: { "Content-Type": "image/png", "Cache-Control": "private, no-store" },
+    });
+  }
   const png = await construirImagenEntrada(datos);
 
   return new NextResponse(new Uint8Array(png), {

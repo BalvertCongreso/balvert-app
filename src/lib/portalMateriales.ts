@@ -56,6 +56,25 @@ export function precioOfrecido(precio: unknown): number | null {
 
 export const MAX_ROLLUPS = 99;
 
+// Medidas del mostrador de UNA categoría, sacadas del texto de Ediciones
+// («Medidas y condiciones»), que las trae juntas en líneas como
+// «- Oro: mostrador de 92 cm de ancho × …» y «- Diamante: …». Así se siguen
+// editando en el mismo sitio. null si no hay línea para esa categoría.
+const LINEA_MEDIDAS: Record<string, string> = {
+  "💎 DIAMANTE": "diamante",
+  "⭐ ORO": "oro",
+};
+
+export function medidasMostrador(texto: string | null, categoria: string | null): string | null {
+  const clave = categoria ? LINEA_MEDIDAS[categoria] : undefined;
+  if (!texto || !clave) return null;
+  for (const linea of texto.split("\n")) {
+    const m = linea.match(/^\s*[-•*]?\s*([^:]+):\s*(.+)$/);
+    if (m && m[1].trim().toLowerCase() === clave) return m[2].trim().replace(/\.$/, "") || null;
+  }
+  return null;
+}
+
 export async function edicionMaterial(supabase: SupabaseClient): Promise<EdicionMaterial | null> {
   const edicionId = await idEdicionActiva(supabase);
   if (!edicionId) return null;

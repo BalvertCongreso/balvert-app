@@ -3,14 +3,16 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import PortalMarco from "@/components/PortalMarco";
-import ComprarEntradas from "@/components/ComprarEntradas";
+import PortalZona, { ContactoZona, EtiquetaEstado, Tarjeta, type CongresoCabecera, type PestanaZona } from "@/components/PortalZona";
 import {
   Aviso,
   DocumentosOrganizacion,
   SeccionMaterial,
   SeccionPatrocinio,
   SeccionPonencia,
+  SeccionProduccion,
   tienePestanaPonencia,
+  tieneProduccion,
   obtenerMateriales,
   type EmpresaMaterial,
 } from "../inicio/MaterialPatrocinador";
@@ -21,26 +23,54 @@ import { DatosEmpresa, InvitacionesEmpresa } from "./SeccionesEmpresa";
 // pasa por /api/portal/materiales/* y /api/portal/empresa/*, que deciden la
 // empresa con la sesión, nunca con lo que mande el navegador.
 
+type Pestana =
+  | "resumen"
+  | "patrocinio"
+  | "invitaciones"
+  | "ponencia"
+  | "produccion"
+  | "material"
+  | "documentos"
+  | "datos"
+  | "acceso";
+
+// «Lo que os falta» (pestaña Resumen): lo calcula /api/portal/empresa/datos
+// con los mismos pendientes que la Zona de patrocinadores del panel.
+interface PasoResumen {
+  titulo: string;
+  detalle: string;
+  hecho: boolean;
+  pestana: "material" | "ponencia" | "invitaciones";
+}
+
 interface DatosEmpresa {
   usuario: string;
   empresa: string | null;
   categoria: string | null;
   edicionNombre: string | null;
+  congreso: CongresoCabecera | null;
   deEstaEdicion: boolean;
   // «Ver como la empresa» desde el panel (sesión de la organización).
   modoOrganizacion: boolean;
   organizador: string | null;
   documentos: { id: string; titulo: string; descripcion: string | null; nombre_archivo: string }[];
+  resumen: {
+    pasos: PasoResumen[];
+    invitados: { asignados: number; incluidos: number };
+    ponencia: "recibida" | "pendiente" | "sin_responder" | null;
+  } | null;
 }
-
-type Pestana = "patrocinio" | "invitaciones" | "ponencia" | "material" | "documentos" | "datos" | "acceso";
 
 const PESTANAS: { id: Pestana; titulo: string; intro: string }[] = [
   {
+    id: "resumen",
+    titulo: "Resumen",
+    intro: "Lo que os queda por hacer antes del congreso, de un vistazo.",
+  },
+  {
     id: "patrocinio",
     titulo: "Mi patrocinio",
-    intro:
-      "Aquí tienes lo que incluye tu patrocinio y puedes pedirnos que te fabriquemos rollups o el vinilado del mostrador. Los precios no incluyen IVA y se facturan después.",
+    intro: "Aquí tienes lo que incluye tu patrocinio.",
   },
   {
     id: "invitaciones",
@@ -53,6 +83,11 @@ const PESTANAS: { id: Pestana; titulo: string; intro: string }[] = [
     titulo: "Ponencia",
     intro:
       "Aquí nos decís si vais a hacer ponencia, los datos del ponente y nos enviáis la presentación. Cuando la subáis, nos llega un aviso y la revisamos.",
+  },
+  {
+    id: "produccion",
+    titulo: "Rollups y vinilado",
+    intro: "Si queréis, os los fabricamos nosotros. No se paga aquí: lo añadimos a vuestra factura.",
   },
   {
     id: "material",
@@ -72,24 +107,37 @@ const PESTANAS: { id: Pestana; titulo: string; intro: string }[] = [
   },
   {
     id: "acceso",
-    titulo: "Cambiar contraseña",
+    titulo: "Contraseña",
     intro:
       "El usuario y la contraseña son de la empresa: los compartís las personas que trabajáis en el patrocinio. Si cambias la contraseña, se cerrará la sesión en los demás dispositivos.",
   },
 ];
 
+// La categoría tal como se enseña en la cabecera: «⭐ ORO» → «⭐ Patrocinador Oro».
+function etiquetaCategoria(categoria: string | null) {
+  if (!categoria) return null;
+  const m = categoria.match(/^(\S+)\s+(.+)$/);
+  if (!m || !/[A-ZÁÉÍÓÚÑ]/.test(m[2])) return categoria;
+  const nombre = m[2].charAt(0) + m[2].slice(1).toLowerCase();
+  return `${m[1]} Patrocinador ${nombre}`;
+}
+
 export default function PortalEmpresaPage() {
   // useSearchParams necesita un Suspense alrededor.
   return (
-    <Suspense
-      fallback={
-        <PortalMarco subtitulo="Zona de patrocinadores" ancho="max-w-3xl">
-          <p className="text-sm text-zinc-500">Cargando…</p>
-        </PortalMarco>
-      }
-    >
+    <Suspense fallback={<Cargando />}>
       <ZonaEmpresa />
     </Suspense>
+  );
+}
+
+function Cargando({ children }: { children?: React.ReactNode }) {
+  return (
+    <div className="px-6 py-8">
+      <PortalMarco subtitulo="Zona de patrocinadores" ancho="max-w-3xl">
+        {children ?? <p className="text-sm text-zinc-500">Cargando…</p>}
+      </PortalMarco>
+    </div>
   );
 }
 
@@ -102,7 +150,7 @@ function ZonaEmpresa() {
   const [error, setError] = useState<string | null>(null);
   const [saliendo, setSaliendo] = useState(false);
 
-  useEffect(() => {
+  const cargarDatos = () =>
     fetch("/api/portal/empresa/datos", { cache: "no-store" })
       .then(async (res) => {
         if (res.status === 401) {
@@ -114,9 +162,13 @@ function ZonaEmpresa() {
         setDatos(data);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Error inesperado. Recarga la página."));
+
+  useEffect(() => {
+    cargarDatos();
     obtenerMateriales()
       .then((lista) => setEmpresa(lista[0] ?? null))
       .catch((e) => setErrorEmpresa(e instanceof Error ? e.message : "Error inesperado."));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   const recargar = () => {
@@ -143,164 +195,271 @@ function ZonaEmpresa() {
     router.replace("/portal");
   }
 
-  const botonSalir = (
-    <button
-      type="button"
-      onClick={salir}
-      disabled={saliendo}
-      className="min-h-11 rounded-md border border-[var(--borde)] px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50 disabled:opacity-60"
-    >
-      Cerrar sesión
-    </button>
-  );
-
   if (error) {
     return (
-      <PortalMarco subtitulo="Zona de patrocinadores" ancho="max-w-3xl" accion={botonSalir}>
+      <Cargando>
         <Aviso tipo="error">{error}</Aviso>
-        <Contacto />
-      </PortalMarco>
+        <button
+          type="button"
+          onClick={salir}
+          disabled={saliendo}
+          className="mt-4 min-h-11 rounded-md border border-[var(--borde)] px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50 disabled:opacity-60"
+        >
+          Cerrar sesión
+        </button>
+        <div className="mt-6">
+          <ContactoZona />
+        </div>
+      </Cargando>
     );
   }
-  if (!datos) {
-    return (
-      <PortalMarco subtitulo="Zona de patrocinadores" ancho="max-w-3xl">
-        <p className="text-sm text-zinc-500">Cargando…</p>
-      </PortalMarco>
-    );
-  }
+  if (!datos) return <Cargando />;
 
   const pedida = searchParams.get("pestana") as Pestana | null;
-  // «Ponencia» solo para quien la tiene; «Cambiar contraseña» no en modo organización.
+  // «Ponencia» y «Rollups y vinilado» solo para quien los tiene; «Contraseña»
+  // no en modo organización.
   const visibles = PESTANAS.filter(
     (p) =>
-      (p.id !== "ponencia" || (empresa && tienePestanaPonencia(empresa))) && (p.id !== "acceso" || !datos.modoOrganizacion)
+      (p.id !== "ponencia" || (empresa && tienePestanaPonencia(empresa))) &&
+      (p.id !== "produccion" || (empresa && tieneProduccion(empresa))) &&
+      (p.id !== "acceso" || !datos.modoOrganizacion)
   );
-  const pestana: Pestana = pedida && visibles.some((p) => p.id === pedida) ? pedida : "patrocinio";
+  const pestana: Pestana = pedida && visibles.some((p) => p.id === pedida) ? pedida : "resumen";
   const info = PESTANAS.find((p) => p.id === pestana)!;
-  const irA = (p: Pestana) => router.replace(`/portal/empresa?pestana=${p}`, { scroll: false });
+  const irA = (p: Pestana) => {
+    // El resumen se vuelve a pedir al abrirlo: refleja lo guardado en las demás pestañas.
+    if (p === "resumen") cargarDatos();
+    router.replace(`/portal/empresa?pestana=${p}`, { scroll: false });
+  };
+
+  // Insignias del menú: lo pendiente de cada pestaña según el resumen.
+  const pendientesDe = (id: Pestana) => datos.resumen?.pasos.filter((x) => x.pestana === id && !x.hecho).length ?? 0;
+  const porAsignar = datos.resumen ? Math.max(0, datos.resumen.invitados.incluidos - datos.resumen.invitados.asignados) : 0;
+  const insignia = (id: Pestana): number | string | null =>
+    id === "invitaciones" ? porAsignar : id === "ponencia" || id === "material" ? (pendientesDe(id) > 0 ? "!" : null) : null;
+  const pestanas: PestanaZona<Pestana>[] = visibles.map(({ id, titulo }) => ({ id, titulo, insignia: insignia(id) }));
+
+  const numDocumentos = datos.documentos.length + (empresa?.organizacion.length ?? 0);
 
   return (
     <>
-    {datos.modoOrganizacion && (
-      <>
-        <div
-          role="status"
-          className="fixed inset-x-0 top-0 z-50 flex flex-wrap items-center justify-center gap-3 bg-amber-100 px-4 py-2 text-center text-sm text-amber-900 shadow"
-        >
-          <span>
-            Estás viendo la zona de <strong>{datos.empresa ?? "la empresa"}</strong> como organización. Lo que cambies quedará
-            a tu nombre.
-          </span>
-          <button
-            type="button"
-            onClick={salirOrganizacion}
-            disabled={saliendo}
-            className="min-h-9 rounded-md border border-amber-400 bg-white px-3 py-1 font-semibold hover:bg-amber-50 disabled:opacity-60"
-          >
-            Salir
-          </button>
-        </div>
-        {/* Hueco para que la franja no tape la cabecera. */}
-        <div className="h-16 sm:h-12" />
-      </>
-    )}
-    <PortalMarco
-      subtitulo={`Zona de patrocinadores${datos.edicionNombre ? ` — ${datos.edicionNombre}` : ""}`}
-      ancho="max-w-3xl"
-      accion={botonSalir}
-    >
-      <div className="mb-4 rounded-md bg-zinc-50 p-3 text-sm">
-        <p className="font-semibold text-zinc-800">{datos.empresa ?? "Empresa patrocinadora"}</p>
-        {datos.categoria && <p className="text-zinc-600">Patrocinio: {datos.categoria}</p>}
-        <p className="text-xs text-zinc-500">Usuario: {datos.usuario}</p>
-      </div>
-      <ComprarEntradas />
-
-      <nav
-        aria-label="Secciones de la zona de empresa"
-        className="-mx-6 mb-5 flex gap-1 overflow-x-auto border-b border-[var(--borde)] px-6 sm:-mx-8 sm:px-8"
-      >
-        {visibles.map(({ id, titulo }) => {
-          const activa = id === pestana;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => irA(id)}
-              aria-current={activa ? "page" : undefined}
-              ref={activa ? (el) => el?.scrollIntoView({ block: "nearest", inline: "nearest" }) : undefined}
-              className={`min-h-11 shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold ${
-                activa
-                  ? "border-[var(--balvert-azul-oscuro)] text-[var(--balvert-azul-oscuro)]"
-                  : "border-transparent text-zinc-500 hover:text-zinc-800"
-              }`}
-            >
-              {titulo}
-            </button>
-          );
-        })}
-      </nav>
-
-      <h2 className="mb-1 text-lg font-semibold text-zinc-800">{info.titulo}</h2>
-      <p className="mb-5 text-sm text-zinc-600">{info.intro}</p>
-
-      {(pestana === "patrocinio" || pestana === "material" || pestana === "ponencia") && (
+      {datos.modoOrganizacion && (
         <>
-          {errorEmpresa && <Aviso tipo="error">{errorEmpresa}</Aviso>}
-          {empresa === undefined && !errorEmpresa && <p className="text-sm text-zinc-500">Cargando…</p>}
-          {empresa === null && (
-            <Aviso tipo="info">
-              Tu patrocinio no está en la edición actual. Si crees que es un error, escríbenos a secretaria@balvert.es.
-            </Aviso>
-          )}
-          {empresa && pestana === "patrocinio" && <SeccionPatrocinio e={empresa} recargar={recargar} />}
-          {empresa && pestana === "ponencia" && <SeccionPonencia e={empresa} recargar={recargar} />}
-          {empresa && pestana === "material" && (
-            <SeccionMaterial e={empresa} recargar={recargar} irAPatrocinio={() => irA("patrocinio")} />
-          )}
+          <div
+            role="status"
+            className="fixed inset-x-0 top-0 z-50 flex flex-wrap items-center justify-center gap-3 bg-amber-100 px-4 py-2 text-center text-sm text-amber-900 shadow"
+          >
+            <span>
+              Estás viendo la zona de <strong>{datos.empresa ?? "la empresa"}</strong> como organización. Lo que cambies
+              quedará a tu nombre.
+            </span>
+            <button
+              type="button"
+              onClick={salirOrganizacion}
+              disabled={saliendo}
+              className="min-h-9 rounded-md border border-amber-400 bg-white px-3 py-1 font-semibold hover:bg-amber-50 disabled:opacity-60"
+            >
+              Salir
+            </button>
+          </div>
+          {/* Hueco para que la franja no tape la cabecera. */}
+          <div className="h-16 bg-amber-100 sm:h-12" />
         </>
       )}
+      <PortalZona
+        subtitulo={`Zona de patrocinadores${datos.edicionNombre ? ` — ${datos.edicionNombre}` : ""}`}
+        saludo={`Hola, ${datos.empresa ?? "empresa patrocinadora"}`}
+        etiqueta={etiquetaCategoria(datos.categoria)}
+        congreso={datos.congreso}
+        pestanas={pestanas}
+        activa={pestana}
+        onIr={irA}
+        onSalir={datos.modoOrganizacion ? salirOrganizacion : salir}
+        saliendo={saliendo}
+      >
+        {/* El resumen empieza directamente con «Lo que os falta», como en la maqueta. */}
+        {pestana !== "resumen" && (
+          <Tarjeta titulo={info.titulo} nivel={2} ayuda={info.intro}>
+            {pestana === "acceso" && <p className="text-xs text-[#5d6b76]">Usuario: {datos.usuario}</p>}
+          </Tarjeta>
+        )}
 
-      {pestana === "documentos" && (
-        <div className="flex flex-col gap-4">
-          {datos.documentos.length === 0 && (!empresa || empresa.organizacion.length === 0) && (
-            <Aviso tipo="info">
-              Todavía no hay documentos para tu empresa. Cuando la organización comparta alguno (por ejemplo, vuestra
-              factura), aparecerá aquí.
-            </Aviso>
-          )}
-          {datos.documentos.length > 0 && (
-            <ul className="flex flex-col gap-2">
-              {datos.documentos.map((d) => (
-                <li
-                  key={d.id}
-                  className="flex flex-col gap-2 rounded-md border border-[var(--borde)] p-4 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="text-sm">
-                    <p className="font-semibold text-zinc-800">{d.titulo}</p>
-                    {d.descripcion && <p className="whitespace-pre-line text-zinc-600">{d.descripcion}</p>}
-                  </div>
-                  <a
-                    href={`/api/portal/empresa/documento?id=${encodeURIComponent(d.id)}`}
-                    className="inline-flex min-h-11 shrink-0 items-center self-start rounded-md border border-[var(--borde)] px-4 py-2 text-sm font-medium text-[var(--balvert-azul-oscuro)] hover:bg-zinc-50 sm:self-auto"
+        {pestana === "resumen" && (
+          <Resumen datos={datos} numDocumentos={numDocumentos} irA={irA} />
+        )}
+
+        {(pestana === "patrocinio" || pestana === "material" || pestana === "ponencia" || pestana === "produccion") && (
+          <>
+            {errorEmpresa && <Aviso tipo="error">{errorEmpresa}</Aviso>}
+            {empresa === undefined && !errorEmpresa && <p className="text-sm text-zinc-500">Cargando…</p>}
+            {empresa === null && (
+              <Aviso tipo="info">
+                Tu patrocinio no está en la edición actual. Si crees que es un error, escríbenos a secretaria@balvert.es.
+              </Aviso>
+            )}
+            {empresa && pestana === "patrocinio" && <SeccionPatrocinio e={empresa} />}
+            {empresa && pestana === "produccion" && <SeccionProduccion key={empresa.id} e={empresa} onGuardado={recargar} />}
+            {empresa && pestana === "ponencia" && <SeccionPonencia e={empresa} recargar={recargar} />}
+            {empresa && pestana === "material" && (
+              <SeccionMaterial e={empresa} recargar={recargar} irAProduccion={() => irA("produccion")} />
+            )}
+          </>
+        )}
+
+        {pestana === "documentos" && (
+          <>
+            {datos.documentos.length === 0 && (!empresa || empresa.organizacion.length === 0) && (
+              <Aviso tipo="info">
+                Todavía no hay documentos para tu empresa. Cuando la organización comparta alguno (por ejemplo, vuestra
+                factura), aparecerá aquí.
+              </Aviso>
+            )}
+            {datos.documentos.length > 0 && (
+              <ul className="grid gap-4 min-[1000px]:grid-cols-2">
+                {datos.documentos.map((d) => (
+                  <li
+                    key={d.id}
+                    className="flex flex-col gap-3 rounded-[14px] border border-[#e3e8ec] bg-white p-5 sm:flex-row sm:items-center sm:justify-between"
                   >
-                    Descargar
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
-          {empresa && <DocumentosOrganizacion empresas={[empresa]} />}
+                    <div className="min-w-0 text-sm">
+                      <p className="font-semibold text-zinc-800">{d.titulo}</p>
+                      {d.descripcion && <p className="whitespace-pre-line text-[#5d6b76]">{d.descripcion}</p>}
+                    </div>
+                    <a
+                      href={`/api/portal/empresa/documento?id=${encodeURIComponent(d.id)}`}
+                      className="inline-flex min-h-11 shrink-0 items-center self-start rounded-[9px] bg-[#eef4f8] px-4 py-2 text-sm font-bold text-[var(--balvert-azul-oscuro)] hover:bg-[#e2edf4] sm:self-auto"
+                    >
+                      Descargar
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {empresa && <DocumentosOrganizacion empresas={[empresa]} />}
+          </>
+        )}
+
+        {pestana === "invitaciones" && <InvitacionesEmpresa />}
+        {pestana === "datos" && <DatosEmpresa />}
+        {pestana === "acceso" && (
+          <Tarjeta>
+            <CambiarContrasena />
+          </Tarjeta>
+        )}
+
+        <ContactoZona />
+      </PortalZona>
+    </>
+  );
+}
+
+// ---- Pestaña «Resumen» ----
+
+function Resumen({
+  datos,
+  numDocumentos,
+  irA,
+}: {
+  datos: DatosEmpresa;
+  numDocumentos: number;
+  irA: (p: Pestana) => void;
+}) {
+  const r = datos.resumen;
+  if (!r) {
+    return (
+      <Aviso tipo="info">
+        Tu patrocinio no está en la edición actual. Si crees que es un error, escríbenos a secretaria@balvert.es.
+      </Aviso>
+    );
+  }
+  const hechos = r.pasos.filter((p) => p.hecho).length;
+  const total = r.pasos.length;
+  const pct = total ? Math.round((hechos / total) * 100) : 100;
+  const enlace = "min-h-11 whitespace-nowrap text-sm font-bold text-[var(--balvert-azul-oscuro)] hover:underline";
+  const estadoPonencia = {
+    recibida: { bien: true, texto: "Presentación recibida", ayuda: "Ya tenemos vuestra presentación." },
+    pendiente: { bien: false, texto: "Pendiente", ayuda: "Datos del ponente y presentación." },
+    sin_responder: { bien: false, texto: "Falta responder", ayuda: "Decidnos si vais a hacer ponencia." },
+  } as const;
+
+  return (
+    <>
+      <Tarjeta titulo="Lo que os falta" nivel={2} ayuda="Completad estos pasos antes del congreso. Os avisaremos si cambia algo.">
+        <div className="flex justify-between text-sm">
+          <b>
+            {hechos} de {total} hechos
+          </b>
+          <span className="text-[#5d6b76]">{pct} %</span>
         </div>
-      )}
+        <div
+          className="mb-4 mt-2.5 h-2.5 overflow-hidden rounded-full bg-[#e7edf1]"
+          role="progressbar"
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        >
+          <i
+            className="block h-full"
+            style={{ width: `${pct}%`, background: "linear-gradient(90deg, var(--balvert-azul), var(--balvert-azul-oscuro))" }}
+          />
+        </div>
+        <ul className="grid gap-2">
+          {r.pasos.map((p) => (
+            <li key={p.titulo} className="flex items-center gap-3 rounded-[10px] border border-[#e3e8ec] px-3 py-2.5">
+              <span
+                aria-hidden="true"
+                className={`flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full text-sm font-extrabold ${
+                  p.hecho ? "bg-[#e3f5ea] text-[#1f8a4c]" : "bg-[#fff3d6] text-[#a86a00]"
+                }`}
+              >
+                {p.hecho ? "✓" : "!"}
+              </span>
+              <span className="min-w-0 flex-1 text-sm">
+                {p.titulo}
+                <small className="block text-[#5d6b76]">
+                  <span className="sr-only">{p.hecho ? "Hecho: " : "Pendiente: "}</span>
+                  {p.detalle}
+                </small>
+              </span>
+              {!p.hecho && (
+                <button type="button" onClick={() => irA(p.pestana)} className={enlace}>
+                  Completar →
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      </Tarjeta>
 
-      {pestana === "invitaciones" && <InvitacionesEmpresa />}
-      {pestana === "datos" && <DatosEmpresa />}
-      {pestana === "acceso" && <CambiarContrasena />}
-
-      <Contacto />
-    </PortalMarco>
+      <div className={`grid gap-4 ${r.ponencia ? "min-[900px]:grid-cols-3" : "min-[900px]:grid-cols-2"}`}>
+        <Tarjeta titulo="Invitaciones">
+          <p className="text-3xl font-extrabold text-[#163f57]">
+            {r.invitados.asignados} / {r.invitados.incluidos}
+          </p>
+          <p className="mb-2 text-sm text-[#5d6b76]">asignadas al congreso</p>
+          <button type="button" onClick={() => irA("invitaciones")} className={enlace}>
+            Ver invitados →
+          </button>
+        </Tarjeta>
+        {r.ponencia && (
+          <Tarjeta titulo="Ponencia">
+            <EtiquetaEstado bien={estadoPonencia[r.ponencia].bien}>{estadoPonencia[r.ponencia].texto}</EtiquetaEstado>
+            <p className="mb-2 mt-2.5 text-sm text-[#5d6b76]">{estadoPonencia[r.ponencia].ayuda}</p>
+            <button type="button" onClick={() => irA("ponencia")} className={enlace}>
+              Ir a la ponencia →
+            </button>
+          </Tarjeta>
+        )}
+        <Tarjeta titulo="Documentos">
+          <p className="text-3xl font-extrabold text-[#163f57]">{numDocumentos}</p>
+          <p className="mb-2 text-sm text-[#5d6b76]">
+            {numDocumentos === 1 ? "documento de la organización" : "documentos de la organización"}
+          </p>
+          <button type="button" onClick={() => irA("documentos")} className={enlace}>
+            Ver documentos →
+          </button>
+        </Tarjeta>
+      </div>
     </>
   );
 }
@@ -368,16 +527,5 @@ function CambiarContrasena() {
         {guardando ? "Guardando…" : "Cambiar contraseña"}
       </button>
     </form>
-  );
-}
-
-function Contacto() {
-  return (
-    <p className="mt-8 border-t border-[var(--borde)] pt-4 text-center text-sm text-zinc-600">
-      ¿Dudas? Escríbenos a{" "}
-      <a href="mailto:secretaria@balvert.es" className="font-medium text-[var(--balvert-azul-oscuro)] underline">
-        secretaria@balvert.es
-      </a>
-    </p>
   );
 }

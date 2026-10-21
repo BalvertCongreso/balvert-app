@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { crearClienteServicio } from "@/lib/supabaseServidor";
 import { NOMBRE_TABLA_SQL, construirDatosEntrada, type Tabla } from "@/lib/entradaDatos";
-import { CAMPO_EMAIL, consultaEntradas, documentosVisibles, idEdicionActiva, patronEmailExacto, sesionPortal } from "@/lib/portal";
+import {
+  CAMPO_EMAIL,
+  consultaEntradas,
+  documentosVisibles,
+  edicionPortal,
+  idEdicionActiva,
+  patronEmailExacto,
+  sesionPortal,
+} from "@/lib/portal";
 
 export const runtime = "nodejs";
 
@@ -31,9 +39,7 @@ export async function GET() {
 
   const supabase = crearClienteServicio();
   const edicionId = await idEdicionActiva(supabase);
-  const { data: edicion } = edicionId
-    ? await supabase.from("ediciones").select("nombre").eq("id", edicionId).maybeSingle()
-    : { data: null };
+  const edicion = await edicionPortal(supabase, edicionId);
 
   const entradas: {
     tabla: Tabla;
@@ -164,7 +170,8 @@ export async function GET() {
   return NextResponse.json(
     {
       email: sesion.email,
-      edicionNombre: edicion?.nombre ?? null,
+      edicionNombre: edicion.nombre,
+      congreso: edicion.congreso,
       entradas,
       compras: [...compras.values()],
       documentos,

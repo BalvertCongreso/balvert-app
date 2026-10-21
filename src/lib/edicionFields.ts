@@ -84,9 +84,9 @@ export const seccionesEdicion: SeccionDef[] = [
       },
       {
         key: "texto_material_patrocinadores",
-        label: "Medidas y condiciones (rollup y vinilado)",
+        label: "Medidas del mostrador (vinilado)",
         tipo: "texto-largo",
-        nota: "Se muestra en el área de cada patrocinador, junto a los precios.",
+        nota: 'Cada patrocinador ve en «Rollups y vinilado» solo la línea de su categoría: una que empiece por "- Oro:" y otra por "- Diamante:" (p. ej. "- Oro: mostrador de 92 cm de ancho × 93 cm de alto × 46 cm de fondo, 6 m² disponibles."). El resto del texto ya no se muestra.',
       },
       {
         key: "incluye_diamante",

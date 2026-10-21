@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import { crearClienteServicio } from "@/lib/supabaseServidor";
 import { sesionEmpresa } from "@/lib/portalEmpresa";
 import { PONENCIA_POR_CATEGORIA } from "@/lib/datosEmpresa";
-import { COLUMNAS_FICHA_PORTAL, edicionMaterial, precioOfrecido, type FichaPortal } from "@/lib/portalMateriales";
+import {
+  COLUMNAS_FICHA_PORTAL,
+  edicionMaterial,
+  medidasMostrador,
+  precioOfrecido,
+  type FichaPortal,
+} from "@/lib/portalMateriales";
 
 export const runtime = "nodejs";
 
@@ -70,6 +76,8 @@ export async function GET() {
         precioRollup,
         precioVinilado: tieneStand ? precioVinilado : null,
         texto: edicion.texto_material_patrocinadores,
+        // Solo las de su mostrador (Oro o Diamante), para «Rollups y vinilado».
+        medidas: tieneStand ? medidasMostrador(edicion.texto_material_patrocinadores, f.categoria) : null,
         rollupsSolicitados: f.rollups_solicitados ?? 0,
         rollupPorNuestraCuenta: f.rollup_por_nuestra_cuenta === "Sí",
         vinilado: f.vinilado_por_nuestra_cuenta === "Sí",

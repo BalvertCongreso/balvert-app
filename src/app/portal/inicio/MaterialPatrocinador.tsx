@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { EtiquetaEstado, Tarjeta } from "@/components/PortalZona";
 import {
   BUCKET_ARCHIVOS_PATROCINADOR,
   FORMATOS_PERMITIDOS,
@@ -15,7 +16,7 @@ import {
   type TipoArchivoPortal,
 } from "@/lib/patrocinadorArchivos";
 
-// Pestañas "Mi patrocinio" y "Material" de la zona de empresa
+// Pestañas "Mi patrocinio", "Rollups y vinilado", "Ponencia" y "Material" de la zona de empresa
 // (/portal/empresa), y los documentos que el equipo comparte con la empresa.
 // Todo pasa por /api/portal/materiales/*, que decide la empresa con la sesión
 // de empresa (el patrocinador_id que se manda se ignora).
@@ -63,6 +64,8 @@ export interface EmpresaMaterial {
     precioRollup: number | null;
     precioVinilado: number | null;
     texto: string | null;
+    // Medidas de SU mostrador (Oro o Diamante), de Ediciones. null si no hay.
+    medidas: string | null;
     rollupsSolicitados: number;
     rollupPorNuestraCuenta: boolean;
     vinilado: boolean;
@@ -117,27 +120,12 @@ export function Aviso({ tipo, children }: { tipo: "error" | "ok" | "info"; child
   return <div className={`rounded-md border p-3 text-sm ${estilos}`}>{children}</div>;
 }
 
+// Tarjeta blanca de la zona (mismo estilo que PortalZona).
 function Bloque({ titulo, ayuda, children }: { titulo: string; ayuda?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div className="rounded-md border border-[var(--borde)] p-4">
-      <h3 className="text-base font-semibold text-[var(--balvert-marron)]">{titulo}</h3>
-      {ayuda && <p className="mt-1 text-sm text-zinc-600">{ayuda}</p>}
-      <div className="mt-3">{children}</div>
-    </div>
-  );
+  return <Tarjeta titulo={titulo} ayuda={ayuda}>{children}</Tarjeta>;
 }
 
-function Etiqueta({ bien, children }: { bien: boolean; children: React.ReactNode }) {
-  return (
-    <span
-      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-        bien ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
-      }`}
-    >
-      {children}
-    </span>
-  );
-}
+const Etiqueta = EtiquetaEstado;
 
 const botonPrincipal =
   "min-h-11 rounded-md bg-[var(--balvert-azul-oscuro)] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50";
@@ -146,7 +134,7 @@ const botonSecundario =
 
 // ---- Pestaña "Mi patrocinio" ----
 
-export function SeccionPatrocinio({ e, recargar }: { e: EmpresaMaterial; recargar: () => void }) {
+export function SeccionPatrocinio({ e }: { e: EmpresaMaterial }) {
   const hayParticulares = Boolean(e.particularesIncluidos || e.particularesExcluidos);
   return (
     <div className="flex flex-col gap-4">
@@ -171,40 +159,81 @@ export function SeccionPatrocinio({ e, recargar }: { e: EmpresaMaterial; recarga
           </div>
         )}
       </Bloque>
-      <Produccion e={e} onGuardado={recargar} />
     </div>
   );
 }
 
-function Produccion({ e, onGuardado }: { e: EmpresaMaterial; onGuardado: () => void }) {
+// ---- Pestaña "Rollups y vinilado" ----
+
+// Quién ofrece la pestaña: si la edición tiene precio de rollup, o de
+// vinilado y la empresa tiene mostrador.
+export function tieneProduccion(e: EmpresaMaterial) {
+  return Boolean(e.produccion.precioRollup || e.produccion.precioVinilado);
+}
+
+// Rollups incluidos en la colocación según la categoría (dossier).
+const ROLLUPS_INCLUIDOS: Record<string, { nombre: string; rollups: number }> = {
+  "💎 DIAMANTE": { nombre: "Diamante", rollups: 2 },
+  "⭐ ORO": { nombre: "Oro", rollups: 1 },
+};
+
+// «92 cm de ancho × 93 cm de alto × 46 cm de fondo, 6 m² disponibles» →
+// recuadros (medida + qué es) y el texto que no sea una medida («espacio doble»).
+function trozosMedidas(texto: string) {
+  const recuadros: { valor: string; que: string }[] = [];
+  const otros: string[] = [];
+  for (const parte of texto.split(/\s*[×·;]\s*|,\s+|\s+x\s+/)) {
+    const limpio = parte.replace(/^mostrador\s+de\s+/i, "").trim();
+    if (!limpio) continue;
+    const m = limpio.match(/^(\d+(?:[.,]\d+)?\s*(?:cm|mm|m²|m2|m))(?:\s+(?:de\s+)?(.*))?$/i);
+    if (m) recuadros.push({ valor: m[1].replace(/m2$/i, "m²"), que: (m[2] ?? "").trim() });
+    else otros.push(limpio.charAt(0).toUpperCase() + limpio.slice(1));
+  }
+  return { recuadros, otros };
+}
+
+export function SeccionProduccion({ e, onGuardado }: { e: EmpresaMaterial; onGuardado: () => void }) {
   const p = e.produccion;
-  const [rollups, setRollups] = useState(String(p.rollupsSolicitados));
+  const [rollups, setRollups] = useState(p.rollupsSolicitados);
   const [vinilado, setVinilado] = useState(p.vinilado);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
 
-  if (!p.precioRollup && !p.precioVinilado) return null;
+  if (!tieneProduccion(e)) return null;
 
-  const numRollups = Number(rollups);
-  const rollupsValido = rollups !== "" && Number.isInteger(numRollups) && numRollups >= 0 && numRollups <= MAX_ROLLUPS;
-  const cambiaRollups = Boolean(p.precioRollup) && rollupsValido && numRollups !== p.rollupsSolicitados;
+  const cambiaRollups = Boolean(p.precioRollup) && rollups !== p.rollupsSolicitados;
   const cambiaVinilado = Boolean(p.precioVinilado) && vinilado !== p.vinilado;
+  const hayCambios = cambiaRollups || cambiaVinilado;
+  const incluidos = e.categoria ? ROLLUPS_INCLUIDOS[e.categoria] : undefined;
+  const medidas = p.medidas ? trozosMedidas(p.medidas) : null;
 
-  async function guardar(ev: React.FormEvent) {
-    ev.preventDefault();
+  // Lo pedido en pantalla (guardado o no) y su total.
+  const pedido: string[] = [];
+  let total = 0;
+  if (p.precioRollup && rollups > 0) {
+    pedido.push(`${rollups} rollup${rollups === 1 ? "" : "s"}`);
+    total += rollups * p.precioRollup;
+  }
+  if (p.precioVinilado && vinilado) {
+    pedido.push("Vinilado del mostrador");
+    total += p.precioVinilado;
+  }
+
+  function cambiarRollups(d: number) {
+    setOk(null);
+    setRollups((n) => Math.max(0, Math.min(MAX_ROLLUPS, n + d)));
+  }
+
+  async function guardar() {
     setError(null);
     setOk(null);
-    if (p.precioRollup && !rollupsValido) {
-      setError(`Escribe cuántos rollups quieres con un número entero entre 0 y ${MAX_ROLLUPS}.`);
-      return;
-    }
     // Confirmación con lo que se pide y su importe.
     const pedir: string[] = [];
     const anular: string[] = [];
     if (cambiaRollups && p.precioRollup) {
-      if (numRollups > 0) {
-        pedir.push(`${numRollups} rollup${numRollups === 1 ? "" : "s"} por ${euros(numRollups * p.precioRollup)} + IVA`);
+      if (rollups > 0) {
+        pedir.push(`${rollups} rollup${rollups === 1 ? "" : "s"} por ${euros(rollups * p.precioRollup)} + IVA`);
       } else {
         anular.push("tu pedido de rollups");
       }
@@ -224,7 +253,7 @@ function Produccion({ e, onGuardado }: { e: EmpresaMaterial; onGuardado: () => v
     try {
       await enviarJson("/api/portal/materiales/produccion", {
         patrocinador_id: e.id,
-        ...(p.precioRollup ? { rollups: numRollups } : {}),
+        ...(p.precioRollup ? { rollups } : {}),
         ...(p.precioVinilado ? { vinilado } : {}),
       });
       setOk("Pedido guardado. Nos llega un aviso y te escribiremos si necesitamos algo más.");
@@ -236,82 +265,154 @@ function Produccion({ e, onGuardado }: { e: EmpresaMaterial; onGuardado: () => v
   }
 
   return (
-    <Bloque
-      titulo="Producción de rollup y vinilado"
-      ayuda="Si quieres, te fabricamos los rollups y/o el vinilado del mostrador. Los precios no incluyen IVA. No se paga aquí: lo añadiremos a tu factura."
-    >
-      <div className="mb-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+    <>
+      <div className={`grid gap-4 ${p.precioRollup && p.precioVinilado ? "min-[900px]:grid-cols-2" : ""}`}>
         {p.precioRollup && (
-          <span>
-            Rollups pedidos: <Etiqueta bien={p.rollupsSolicitados > 0}>{p.rollupsSolicitados}</Etiqueta>
-          </span>
-        )}
-        {p.precioVinilado && (
-          <span>
-            Vinilado: <Etiqueta bien={p.vinilado}>{p.vinilado ? "Pedido" : "No pedido"}</Etiqueta>
-          </span>
-        )}
-      </div>
-      {p.texto && <p className="mb-4 whitespace-pre-line rounded-md bg-zinc-50 p-3 text-sm text-zinc-700">{p.texto}</p>}
-      <form onSubmit={guardar} className="flex flex-col gap-5">
-        {p.precioRollup && (
-          <div>
-            <label className="campo-label" htmlFor={`rollups-${e.id}`}>
-              ¿Cuántos rollups quieres que te fabriquemos?
-            </label>
-            <p className="mb-2 text-xs text-zinc-500">
-              Rollup de 150 × 200 cm, {euros(p.precioRollup)} + IVA cada uno. Pon 0 si no quieres ninguno.
-            </p>
-            <div className="flex flex-wrap items-center gap-3">
-              <input
-                id={`rollups-${e.id}`}
-                type="number"
-                min={0}
-                max={MAX_ROLLUPS}
-                step={1}
-                inputMode="numeric"
-                className="campo-input w-24 text-base"
-                value={rollups}
-                onChange={(ev) => setRollups(ev.target.value)}
-              />
-              <span className="text-sm text-zinc-700">
-                {rollupsValido ? (
+          <Tarjeta titulo="Rollups" className="flex flex-col">
+            <div className="flex flex-col gap-3">
+              <p className="text-[22px] font-extrabold text-[#163f57]">
+                {euros(p.precioRollup)}{" "}
+                <small className="text-[13px] font-semibold text-[#5d6b76]">+ IVA cada uno · 150 × 200 cm</small>
+              </p>
+              <p className="rounded-lg border-l-4 border-[var(--balvert-azul)] bg-[#f1f7fb] px-3 py-2.5 text-[13px] leading-relaxed text-[#29404f]">
+                {incluidos ? (
                   <>
-                    Total: <strong>{euros(numRollups * p.precioRollup)} + IVA</strong>
+                    Vuestro patrocinio {incluidos.nombre} ya incluye la{" "}
+                    <strong>
+                      colocación de {incluidos.rollups} rollup{incluidos.rollups === 1 ? "" : "s"}
+                    </strong>{" "}
+                    en el congreso. Aquí podéis pedirnos que os fabriquemos los que queráis.
                   </>
                 ) : (
-                  `Un número entre 0 y ${MAX_ROLLUPS}`
+                  "Podéis pedirnos que os fabriquemos los que queráis."
                 )}
-              </span>
+              </p>
+              <p id={`rollups-${e.id}`} className="text-sm font-bold">
+                ¿Cuántos queréis que os fabriquemos?
+              </p>
+              <div
+                role="group"
+                aria-labelledby={`rollups-${e.id}`}
+                className="flex w-max items-center overflow-hidden rounded-xl border border-[#e3e8ec]"
+              >
+                <button
+                  type="button"
+                  aria-label="Uno menos"
+                  onClick={() => cambiarRollups(-1)}
+                  disabled={rollups <= 0}
+                  className="h-12 w-12 bg-[#f3f6f8] text-2xl text-[var(--balvert-azul-oscuro)] disabled:opacity-40"
+                >
+                  −
+                </button>
+                <output aria-live="polite" className="w-16 text-center text-xl font-extrabold">
+                  {rollups}
+                </output>
+                <button
+                  type="button"
+                  aria-label="Uno más"
+                  onClick={() => cambiarRollups(1)}
+                  disabled={rollups >= MAX_ROLLUPS}
+                  className="h-12 w-12 bg-[#f3f6f8] text-2xl text-[var(--balvert-azul-oscuro)] disabled:opacity-40"
+                >
+                  +
+                </button>
+              </div>
+              <p className="text-sm text-[#5d6b76]">
+                Subtotal: <strong className="text-[#1f2a33]">{euros(rollups * p.precioRollup)}</strong> + IVA
+              </p>
             </div>
-          </div>
+          </Tarjeta>
         )}
         {p.precioVinilado && (
-          <label className="flex items-start gap-3 text-sm text-zinc-700">
-            <input
-              type="checkbox"
-              className="mt-0.5 h-5 w-5"
-              checked={vinilado}
-              onChange={(ev) => setVinilado(ev.target.checked)}
-            />
-            <span>
-              Quiero que me hagáis el vinilado del mostrador: <strong>{euros(p.precioVinilado)} + IVA</strong>, precio cerrado
-              por el mostrador completo.
-            </span>
-          </label>
+          <Tarjeta titulo="Vinilado del mostrador" className="flex flex-col">
+            <div className="flex flex-col gap-3">
+              <p className="text-[22px] font-extrabold text-[#163f57]">
+                {euros(p.precioVinilado)}{" "}
+                <small className="text-[13px] font-semibold text-[#5d6b76]">+ IVA · precio cerrado</small>
+              </p>
+              {medidas && (medidas.recuadros.length > 0 || medidas.otros.length > 0) && (
+                <div className="flex flex-col gap-2">
+                  <p className="text-[13px] text-[#5d6b76]">
+                    Vuestro mostrador{incluidos ? ` (${incluidos.nombre})` : ""}
+                    {medidas.otros.length > 0 ? `: ${medidas.otros.join(" · ")}` : ":"}
+                  </p>
+                  {medidas.recuadros.length > 0 && (
+                    <div
+                      className={`grid gap-2 ${
+                        medidas.recuadros.length <= 3 ? "grid-cols-3" : "grid-cols-2 min-[480px]:grid-cols-4"
+                      }`}
+                    >
+                      {medidas.recuadros.map((r, i) => (
+                        <div key={i} className="rounded-[10px] bg-[#f6f8fa] p-2 text-center text-xs text-[#5d6b76]">
+                          <b className="block text-base text-[#1f2a33]">{r.valor}</b>
+                          {r.que}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={vinilado}
+                onClick={() => {
+                  setOk(null);
+                  setVinilado((v) => !v);
+                }}
+                className={`flex items-center gap-3 rounded-xl border-2 p-3 text-left ${
+                  vinilado ? "border-[var(--balvert-azul)] bg-[#f1f9fe]" : "border-[#e3e8ec] bg-white"
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`relative h-[26px] w-[46px] flex-none rounded-full transition-colors ${
+                    vinilado ? "bg-[var(--balvert-azul-oscuro)]" : "bg-[#cfd8de]"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-[3px] h-5 w-5 rounded-full bg-white shadow transition-all ${
+                      vinilado ? "left-[23px]" : "left-[3px]"
+                    }`}
+                  />
+                </span>
+                <span className="text-sm">
+                  <b>Sí, queremos el vinilado</b>
+                  <br />
+                  <small className="text-[#5d6b76]">Os pediremos el diseño en «Material».</small>
+                </span>
+              </button>
+            </div>
+          </Tarjeta>
         )}
-        {error && <Aviso tipo="error">{error}</Aviso>}
-        {ok && <Aviso tipo="ok">{ok}</Aviso>}
+      </div>
+
+      {error && <Aviso tipo="error">{error}</Aviso>}
+      {ok && <Aviso tipo="ok">{ok}</Aviso>}
+
+      {/* Barra del total: fija abajo en móvil. */}
+      <div className="sticky bottom-2.5 z-10 flex flex-wrap items-center justify-between gap-3.5 rounded-[14px] bg-[#163f57] px-5 py-4 text-white shadow-lg min-[760px]:static min-[760px]:shadow-none">
         <div>
-          <button type="submit" disabled={guardando || (!cambiaRollups && !cambiaVinilado)} className={botonPrincipal}>
-            {guardando ? "Guardando…" : "Guardar mi pedido"}
-          </button>
-          {!cambiaRollups && !cambiaVinilado && !guardando && (
-            <p className="mt-2 text-xs text-zinc-500">Cambia la cantidad o la casilla para poder guardar.</p>
-          )}
+          <p className="text-sm opacity-90">{pedido.length ? pedido.join(" + ") : "No habéis pedido nada"}</p>
+          <p className="text-2xl font-extrabold">
+            {euros(total)} <small className="text-sm font-semibold">+ IVA</small>
+          </p>
         </div>
-      </form>
-    </Bloque>
+        <div className="text-right">
+          <button
+            type="button"
+            onClick={guardar}
+            disabled={!hayCambios || guardando}
+            className="min-h-11 rounded-[10px] bg-[var(--balvert-marron-claro)] px-4 text-sm font-bold text-[#2b1f00] disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            {guardando ? "Guardando…" : "Guardar cambios"}
+          </button>
+          <p className={`mt-1 text-[13px] ${hayCambios ? "text-[#ffe3a3]" : "text-[#bfe6c9]"}`}>
+            {hayCambios ? "Tienes cambios sin guardar" : "✓ Pedido guardado"}
+          </p>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -330,12 +431,12 @@ const TEXTO_TIPO: Record<TipoArchivoPortal, { opcion: string; ayuda: string; rec
   },
   rollup: {
     opcion: "Diseño del rollup",
-    ayuda: "El diseño para tu rollup de 150 × 200 cm. Si quieres que te lo fabriquemos, pídelo en la pestaña «Mi patrocinio».",
+    ayuda: "El diseño para tu rollup de 150 × 200 cm. Si quieres que te lo fabriquemos, pídelo en la pestaña «Rollups y vinilado».",
     recibido: "Diseño del rollup recibido",
   },
   vinilado: {
     opcion: "Diseño del vinilado",
-    ayuda: "El diseño para vinilar el mostrador (las medidas están en la pestaña «Mi patrocinio», donde también puedes pedirlo).",
+    ayuda: "El diseño para vinilar el mostrador (las medidas están en la pestaña «Rollups y vinilado», donde también puedes pedirlo).",
     recibido: "Diseño del vinilado recibido",
   },
 };
@@ -432,11 +533,11 @@ export function SeccionPonencia({ e, recargar }: { e: EmpresaMaterial; recargar:
 export function SeccionMaterial({
   e,
   recargar,
-  irAPatrocinio,
+  irAProduccion,
 }: {
   e: EmpresaMaterial;
   recargar: () => void;
-  irAPatrocinio: () => void;
+  irAProduccion: () => void;
 }) {
   const p = e.produccion;
   return (
@@ -462,8 +563,8 @@ export function SeccionMaterial({
         {(p.precioRollup || p.precioVinilado) && (
           <p className="mt-3 text-xs text-zinc-500">
             Los rollups y el vinilado se piden en la pestaña{" "}
-            <button type="button" onClick={irAPatrocinio} className="font-medium text-[var(--balvert-azul-oscuro)] underline">
-              Mi patrocinio
+            <button type="button" onClick={irAProduccion} className="font-medium text-[var(--balvert-azul-oscuro)] underline">
+              Rollups y vinilado
             </button>
             .
           </p>

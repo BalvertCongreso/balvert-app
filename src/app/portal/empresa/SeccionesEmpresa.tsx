@@ -15,6 +15,7 @@ import {
 } from "@/lib/invitados";
 import { CAMPOS_CONTACTO, CAMPOS_FACTURACION_EMPRESA, type CampoEmpresa } from "@/lib/datosEmpresa";
 import ExtrasInvitado from "@/components/ExtrasInvitado";
+import { EtiquetaEstado, Tarjeta } from "@/components/PortalZona";
 
 // Pestañas «Invitaciones» y «Datos de la empresa» de la zona de empresa. Las
 // rutas (/api/portal/empresa/*) deciden la empresa con la sesión y validan
@@ -143,19 +144,23 @@ export function InvitacionesEmpresa() {
     setQuitando(null);
   }
 
-  const resumenLinea = (titulo: string, ev: EventoInvitado) => (
-    <p>
-      <span className="font-semibold">{titulo}</span> — Incluidas: {incluidas[ev]} · Asignadas: {asignadas[ev]} · Por asignar:{" "}
-      {quedan(ev)}
-    </p>
+  const resumenTarjeta = (titulo: string, ev: EventoInvitado) => (
+    <Tarjeta titulo={titulo}>
+      <p className="text-3xl font-extrabold text-[#163f57]">
+        {asignadas[ev]} / {incluidas[ev]}
+      </p>
+      <p className="mt-1 text-sm text-[#5d6b76]">
+        asignadas · {quedan(ev) === 0 ? "ninguna por asignar" : `${quedan(ev)} por asignar`}
+      </p>
+    </Tarjeta>
   );
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1 rounded-md bg-zinc-50 p-3 text-sm text-zinc-700">
-        {resumenLinea("Congreso", "congreso")}
-        {esDiamante && resumenLinea("Cena de gala", "gala")}
-        {esDiamante && resumenLinea("Excursión", "excursion")}
+      <div className={`grid gap-4 ${esDiamante ? "min-[900px]:grid-cols-3" : ""}`}>
+        {resumenTarjeta("Congreso", "congreso")}
+        {esDiamante && resumenTarjeta("Cena de gala", "gala")}
+        {esDiamante && resumenTarjeta("Excursión", "excursion")}
       </div>
 
       {error && <Aviso tipo="error">{error}</Aviso>}
@@ -170,7 +175,7 @@ export function InvitacionesEmpresa() {
           </button>
         </div>
       ) : (
-        <form onSubmit={anadir} className="grid gap-4 rounded-md border border-[var(--borde)] p-4 sm:grid-cols-2">
+        <form onSubmit={anadir} className="grid gap-4 rounded-[14px] border border-[#e3e8ec] bg-white p-5 sm:grid-cols-2">
           <div>
             <label className="campo-label" htmlFor="inv-nombre">Nombre y apellidos *</label>
             <input id="inv-nombre" className="campo-input text-base" maxLength={150} value={nombre} onChange={(e) => setNombre(e.target.value)} />
@@ -225,11 +230,14 @@ export function InvitacionesEmpresa() {
       )}
 
       {invitados.length === 0 ? (
-        <p className="text-sm text-zinc-500">Todavía no habéis asignado ninguna invitación.</p>
+        <Tarjeta ayuda="Todavía no habéis asignado ninguna invitación." />
       ) : (
-        <ul className="flex flex-col divide-y divide-[var(--borde)] rounded-md border border-[var(--borde)]">
+        <ul className="grid gap-4 min-[1100px]:grid-cols-2">
           {invitados.map((inv) => (
-            <li key={inv.clave} className="flex flex-col gap-3 p-4 text-sm sm:flex-row sm:items-start sm:justify-between">
+            <li
+              key={inv.clave}
+              className="flex flex-col gap-3 rounded-[14px] border border-[#e3e8ec] bg-white p-5 text-sm sm:flex-row sm:items-start sm:justify-between"
+            >
               <div className="min-w-0">
                 <p className="font-semibold text-zinc-800">{inv.nombre || "—"}</p>
                 <p className="break-all text-zinc-500">{inv.email}</p>
@@ -273,13 +281,7 @@ function EntradaFila({ tabla, titulo, entrada }: { tabla: EventoInvitado; titulo
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span className="w-28 font-medium text-zinc-700">{titulo}</span>
-      <span
-        className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-          entrada.estado === "enviada" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
-        }`}
-      >
-        {NOMBRE_ESTADO_ENTRADA[entrada.estado]}
-      </span>
+      <EtiquetaEstado bien={entrada.estado === "enviada"}>{NOMBRE_ESTADO_ENTRADA[entrada.estado]}</EtiquetaEstado>
       {entrada.estado !== "sin_generar" && (
         <a
           href={`/api/portal/empresa/entrada?tabla=${tabla}&id=${encodeURIComponent(entrada.id)}`}
@@ -358,17 +360,13 @@ export function DatosEmpresa() {
   );
 
   return (
-    <form onSubmit={guardar} className="flex flex-col gap-6">
-      <section>
-        <h3 className="mb-1 text-base font-semibold text-[var(--balvert-marron)]">Personas de contacto</h3>
-        <p className="mb-3 text-sm text-zinc-600">Con quién hablamos sobre el patrocinio.</p>
+    <form onSubmit={guardar} className="flex flex-col gap-4">
+      <Tarjeta titulo="Personas de contacto" ayuda="Con quién hablamos sobre el patrocinio.">
         <div className="grid gap-4 sm:grid-cols-2">{CAMPOS_CONTACTO.map(campo)}</div>
-      </section>
-      <section>
-        <h3 className="mb-1 text-base font-semibold text-[var(--balvert-marron)]">Datos de facturación</h3>
-        <p className="mb-3 text-sm text-zinc-600">Los datos con los que os haremos la factura.</p>
+      </Tarjeta>
+      <Tarjeta titulo="Datos de facturación" ayuda="Los datos con los que os haremos la factura.">
         <div className="grid gap-4 sm:grid-cols-2">{CAMPOS_FACTURACION_EMPRESA.map(campo)}</div>
-      </section>
+      </Tarjeta>
       {error && <Aviso tipo="error">{error}</Aviso>}
       {ok && <Aviso tipo="ok">Datos guardados. Gracias.</Aviso>}
       <div>

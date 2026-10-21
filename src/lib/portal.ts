@@ -69,6 +69,50 @@ export async function idEdicionActiva(supabase: SupabaseClient): Promise<string 
   return data?.id ?? null;
 }
 
+// Cabecera de las dos zonas del portal: lugar, días y fecha de inicio (para
+// la cuenta atrás) del congreso de la edición.
+export interface CongresoPortal {
+  lugar: string | null;
+  dias: string | null;
+  fechaInicio: string | null;
+}
+
+const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+
+// «16 y 17 de marzo de 2027», «16 al 18 de marzo de 2027», «30 de marzo al
+// 1 de abril de 2027». Fechas "AAAA-MM-DD".
+function textoDias(inicio: string | null, fin: string | null): string | null {
+  if (!inicio) return null;
+  const [a1, m1, d1] = inicio.slice(0, 10).split("-").map(Number);
+  if (!fin || fin.slice(0, 10) <= inicio.slice(0, 10)) return `${d1} de ${MESES[m1 - 1]} de ${a1}`;
+  const [a2, m2, d2] = fin.slice(0, 10).split("-").map(Number);
+  if (a1 === a2 && m1 === m2) return `${d1} ${d2 - d1 === 1 ? "y" : "al"} ${d2} de ${MESES[m1 - 1]} de ${a1}`;
+  if (a1 === a2) return `${d1} de ${MESES[m1 - 1]} al ${d2} de ${MESES[m2 - 1]} de ${a1}`;
+  return `${d1} de ${MESES[m1 - 1]} de ${a1} al ${d2} de ${MESES[m2 - 1]} de ${a2}`;
+}
+
+export async function edicionPortal(
+  supabase: SupabaseClient,
+  edicionId: string | null
+): Promise<{ nombre: string | null; congreso: CongresoPortal }> {
+  const vacio = { nombre: null, congreso: { lugar: null, dias: null, fechaInicio: null } };
+  if (!edicionId) return vacio;
+  const { data } = await supabase
+    .from("ediciones")
+    .select("nombre, fecha_inicio, fecha_fin, lugar_congreso, certificado_dias")
+    .eq("id", edicionId)
+    .maybeSingle();
+  if (!data) return vacio;
+  return {
+    nombre: data.nombre ?? null,
+    congreso: {
+      lugar: data.lugar_congreso?.trim() || null,
+      dias: data.certificado_dias?.trim() || textoDias(data.fecha_inicio, data.fecha_fin),
+      fechaInicio: data.fecha_inicio ?? null,
+    },
+  };
+}
+
 // ¿Tiene este email alguna entrada (con QR o sin él) en la edición activa?
 export async function tieneEntradas(supabase: SupabaseClient, edicionId: string, email: string): Promise<boolean> {
   const patron = patronEmailExacto(email);

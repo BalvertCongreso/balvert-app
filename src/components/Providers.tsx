@@ -31,6 +31,9 @@ function esRutaEncuesta(pathname: string) {
 // Rutas que ocupan todo el ancho de pantalla en vez del max-w-6xl centrado habitual.
 const RUTAS_ANCHO_COMPLETO: string[] = ["/"];
 
+// Zonas del portal: cabecera a todo el ancho y su propio margen (PortalZona).
+const RUTAS_PORTAL_ZONA: string[] = ["/portal/inicio", "/portal/empresa"];
+
 function Contenido({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { session, cargando } = useAuth();
@@ -38,6 +41,7 @@ function Contenido({ children }: { children: React.ReactNode }) {
   const esAnchoCompleto = RUTAS_ANCHO_COMPLETO.includes(pathname ?? "");
 
   if (esRutaPublica) {
+    if (RUTAS_PORTAL_ZONA.includes(pathname ?? "")) return <main className="flex w-full flex-1 flex-col">{children}</main>;
     return <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">{children}</main>;
   }
 
