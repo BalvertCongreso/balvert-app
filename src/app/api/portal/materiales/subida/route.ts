@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { crearClienteServicio } from "@/lib/supabaseServidor";
-import { sesionPortal } from "@/lib/portal";
+import { claveAcciones, sesionEmpresa } from "@/lib/portalEmpresa";
 import {
   BUCKET_ARCHIVOS_PATROCINADOR,
   FORMATOS_PERMITIDOS,
@@ -17,7 +17,7 @@ import {
   MENSAJE_LIMITE,
   accionesUltimaHora,
   edicionMaterial,
-  fichaDeMiEmpresa,
+  fichaDeLaSesion,
   registrarAccion,
 } from "@/lib/portalMateriales";
 
@@ -25,10 +25,10 @@ export const runtime = "nodejs";
 
 // Prepara la subida de un archivo desde el portal: URL firmada de un solo uso
 // para subir directamente al bucket privado, en la carpeta de SU empresa. La
-// ruta queda apuntada a nombre de este email: /api/portal/materiales/archivo
-// solo registra rutas preparadas aquí por la misma persona.
+// ruta queda apuntada a nombre de esta empresa: /api/portal/materiales/archivo
+// solo registra rutas preparadas aquí por la misma empresa.
 export async function POST(req: Request) {
-  const sesion = await sesionPortal();
+  const sesion = await sesionEmpresa();
   if (!sesion) return NextResponse.json({ error: "Tu sesión ha caducado. Vuelve a entrar." }, { status: 401 });
 
   const body = await req.json().catch(() => null);
@@ -46,10 +46,10 @@ export async function POST(req: Request) {
 
   const supabase = crearClienteServicio();
   const edicion = await edicionMaterial(supabase);
-  const ficha = edicion ? await fichaDeMiEmpresa(supabase, edicion.id, sesion.email, body?.patrocinador_id) : null;
+  const ficha = edicion ? await fichaDeLaSesion(supabase, edicion.id, sesion.patrocinadorId) : null;
   if (!ficha) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
 
-  if ((await accionesUltimaHora(supabase, sesion.email, ["preparar_subida"])) >= LIMITE_SUBIDAS_POR_HORA) {
+  if ((await accionesUltimaHora(supabase, claveAcciones(sesion), ["preparar_subida"])) >= LIMITE_SUBIDAS_POR_HORA) {
     return NextResponse.json({ error: MENSAJE_LIMITE }, { status: 429 });
   }
 
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "No se pudo preparar la subida. Inténtalo de nuevo." }, { status: 502 });
   }
   try {
-    await registrarAccion(supabase, sesion.email, "preparar_subida", data.path);
+    await registrarAccion(supabase, claveAcciones(sesion), "preparar_subida", data.path);
   } catch (e) {
     console.error("portal/materiales/subida:", e instanceof Error ? e.message : e);
     return NextResponse.json({ error: "No se pudo preparar la subida. Inténtalo de nuevo." }, { status: 500 });

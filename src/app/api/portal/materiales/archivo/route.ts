@@ -1,6 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { crearClienteServicio } from "@/lib/supabaseServidor";
-import { empresasDelEmail, sesionPortal } from "@/lib/portal";
+import { autorEmpresa, claveAcciones, sesionEmpresa } from "@/lib/portalEmpresa";
 import {
   BUCKET_ARCHIVOS_PATROCINADOR,
   CASILLA_POR_TIPO,
@@ -11,11 +11,10 @@ import {
   esTipoArchivoPortal,
 } from "@/lib/patrocinadorArchivos";
 import {
-  autorPortal,
   avisarSecretaria,
   crearTareaRevision,
   edicionMaterial,
-  fichaDeMiEmpresa,
+  fichaDeLaSesion,
   nombreEmpresa,
 } from "@/lib/portalMateriales";
 
@@ -26,7 +25,7 @@ export const runtime = "nodejs";
 // ponencia → "Ponencia recibida"), crea la tarea de revisión y avisa por
 // email a la secretaría.
 export async function POST(req: Request) {
-  const sesion = await sesionPortal();
+  const sesion = await sesionEmpresa();
   if (!sesion) return NextResponse.json({ error: "Tu sesión ha caducado. Vuelve a entrar." }, { status: 401 });
 
   const body = await req.json().catch(() => null);
@@ -43,11 +42,11 @@ export async function POST(req: Request) {
 
   const supabase = crearClienteServicio();
   const edicion = await edicionMaterial(supabase);
-  const ficha = edicion ? await fichaDeMiEmpresa(supabase, edicion.id, sesion.email, body?.patrocinador_id) : null;
+  const ficha = edicion ? await fichaDeLaSesion(supabase, edicion.id, sesion.patrocinadorId) : null;
   if (!edicion || !ficha) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
 
   // Solo una ruta de la carpeta de SU empresa que haya preparado esta misma
-  // persona en las últimas 2 horas, y que esté subida de verdad.
+  // empresa en las últimas 2 horas, y que esté subida de verdad.
   const partes = ruta.split("/");
   const noValido = NextResponse.json({ error: "Archivo no válido. Vuelve a subirlo." }, { status: 400 });
   if (partes.length !== 3 || partes[0] !== ficha.id || ruta.includes("..")) return noValido;
@@ -55,7 +54,7 @@ export async function POST(req: Request) {
   const { count } = await supabase
     .from("portal_acciones")
     .select("id", { count: "exact", head: true })
-    .eq("email", sesion.email)
+    .eq("email", claveAcciones(sesion))
     .eq("accion", "preparar_subida")
     .eq("detalle", ruta)
     .gte("creado", haceDosHoras);
@@ -65,7 +64,7 @@ export async function POST(req: Request) {
   const { data: existe } = await bucket.exists(ruta);
   if (!existe) return NextResponse.json({ error: "El archivo no se ha subido. Inténtalo de nuevo." }, { status: 400 });
 
-  const autor = autorPortal(sesion.email);
+  const autor = autorEmpresa(sesion);
   const { error } = await supabase.from("patrocinador_archivos").insert({
     patrocinador_id: ficha.id,
     tipo,
@@ -73,7 +72,7 @@ export async function POST(req: Request) {
     nombre_archivo: partes[2],
     autor,
     origen: "patrocinador",
-    email_subida: sesion.email,
+    email_subida: sesion.usuario,
     comentario: comentario || null,
     visible_empresa: false,
   });
@@ -97,7 +96,7 @@ export async function POST(req: Request) {
   const nombreTipo = NOMBRE_TIPO_ARCHIVO[tipo].toLowerCase();
   const detalle = [
     `Empresa: ${empresa}`,
-    `Subido por: ${sesion.email}`,
+    `Subido por: ${autor}`,
     `Tipo: ${NOMBRE_TIPO_ARCHIVO[tipo]}`,
     `Archivo: ${partes[2]}`,
     `Comentario: ${comentario || "—"}`,
@@ -127,7 +126,7 @@ export async function POST(req: Request) {
 // La empresa borra un archivo que subió ELLA (nunca los del equipo). Si era
 // su último logo/ponencia, la casilla de la ficha vuelve a "No".
 export async function DELETE(req: Request) {
-  const sesion = await sesionPortal();
+  const sesion = await sesionEmpresa();
   if (!sesion) return NextResponse.json({ error: "Tu sesión ha caducado. Vuelve a entrar." }, { status: 401 });
   const id = new URL(req.url).searchParams.get("id");
   const noEncontrado = NextResponse.json({ error: "Archivo no encontrado." }, { status: 404 });
@@ -136,15 +135,13 @@ export async function DELETE(req: Request) {
   const supabase = crearClienteServicio();
   const edicion = await edicionMaterial(supabase);
   if (!edicion) return noEncontrado;
-  const ids = (await empresasDelEmail(supabase, edicion.id, sesion.email)).map((e) => e.id);
-  if (ids.length === 0) return noEncontrado;
 
   const { data: archivo } = await supabase
     .from("patrocinador_archivos")
     .select("id, ruta_archivo, patrocinador_id, tipo")
     .eq("id", id)
     .eq("origen", "patrocinador")
-    .in("patrocinador_id", ids)
+    .eq("patrocinador_id", sesion.patrocinadorId)
     .maybeSingle();
   if (!archivo) return noEncontrado;
 
@@ -155,7 +152,7 @@ export async function DELETE(req: Request) {
   }
   await supabase.storage.from(BUCKET_ARCHIVOS_PATROCINADOR).remove([archivo.ruta_archivo]);
   try {
-    await desmarcarCasillaSiNoQuedan(supabase, archivo.patrocinador_id, archivo.tipo, autorPortal(sesion.email));
+    await desmarcarCasillaSiNoQuedan(supabase, archivo.patrocinador_id, archivo.tipo, autorEmpresa(sesion));
   } catch (e) {
     console.error("portal/materiales/archivo: no se pudo desmarcar la casilla", e instanceof Error ? e.message : e);
   }

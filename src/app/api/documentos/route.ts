@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { crearClienteServicio, usuarioDesdeCabecera } from "@/lib/supabaseServidor";
-import { EMAIL_REGEX, empresasDelEmail, idEdicionActiva, normalizarEmail, origenDeConfianza, tieneEntradas } from "@/lib/portal";
+import { EMAIL_REGEX, idEdicionActiva, normalizarEmail, origenDeConfianza, tieneEntradas } from "@/lib/portal";
 import { enviarAvisoDocumento } from "@/lib/avisoDocumento";
 import { BUCKET_DOCUMENTOS, MAX_DESCRIPCION, MAX_TITULO, esDestino } from "@/lib/documentos";
 
@@ -87,16 +87,13 @@ export async function POST(req: Request) {
     }
   }
 
-  // Para evitar erratas: el email tiene que poder entrar en el portal (tener
-  // entradas o ser contacto de un patrocinador en la edición activa).
+  // Para evitar erratas: el email tiene que poder entrar en su zona personal
+  // del portal (tener alguna entrada en la edición activa). Las empresas
+  // entran con su usuario y contraseña, no con el email de un contacto.
   if (destino === "asistente") {
-    const [conEntradas, empresas] = await Promise.all([
-      tieneEntradas(supabase, edicionId, emailDestinatario),
-      empresasDelEmail(supabase, edicionId, emailDestinatario),
-    ]);
-    if (!conEntradas && empresas.length === 0) {
+    if (!(await tieneEntradas(supabase, edicionId, emailDestinatario))) {
       return NextResponse.json(
-        { error: "Ese email no tiene entradas ni es contacto de un patrocinador en esta edición: no podría entrar al área de clientes para verlo. Revisa que esté bien escrito." },
+        { error: "Ese email no tiene entradas en esta edición: no podría entrar en su zona personal para verlo. Revisa que esté bien escrito. (Para una empresa, súbelo como documento de la empresa.)" },
         { status: 400 }
       );
     }

@@ -1,13 +1,12 @@
 // Material de los patrocinadores desde el portal (/api/portal/materiales/*):
 // subir logos, ponencias, rollups y vinilados, pedir que les fabriquemos
 // rollups/vinilado y rellenar los datos del ponente. Mismas reglas que el
-// resto del portal (ver src/lib/portal.ts): la empresa se comprueba SIEMPRE
-// con empresasDelEmail y el email de la sesión; el id que manda el navegador
-// solo sirve para elegir entre SUS empresas.
+// resto del portal: la empresa es SIEMPRE la de la sesión de empresa (usuario
+// y contraseña, ver src/lib/portalEmpresa.ts); nunca un id del navegador.
 import { Resend } from "resend";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ORIGEN_PUBLICO } from "@/lib/dominio";
-import { empresasDelEmail, idEdicionActiva } from "@/lib/portal";
+import { idEdicionActiva } from "@/lib/portal";
 
 // Columnas de la ficha que el portal lee (y ninguna más: nada de
 // facturación, contactos ni observaciones internas).
@@ -62,18 +61,13 @@ export async function edicionMaterial(supabase: SupabaseClient): Promise<Edicion
   return (data as EdicionMaterial | null) ?? null;
 }
 
-// La ficha de una de las empresas de este email en la edición activa, o null
-// si ese id no es de una de sus empresas (no se distingue "no existe" de "no
-// es tuya").
-export async function fichaDeMiEmpresa(
+// La ficha de la empresa de la sesión en la edición activa, o null si la
+// empresa no es de la edición activa.
+export async function fichaDeLaSesion(
   supabase: SupabaseClient,
   edicionId: string,
-  email: string,
-  patrocinadorId: unknown
+  patrocinadorId: string
 ): Promise<FichaPortal | null> {
-  if (typeof patrocinadorId !== "string" || !patrocinadorId) return null;
-  const empresas = await empresasDelEmail(supabase, edicionId, email);
-  if (!empresas.some((e) => e.id === patrocinadorId)) return null;
   const { data } = await supabase
     .from("patrocinadores")
     .select(COLUMNAS_FICHA_PORTAL)
@@ -81,10 +75,6 @@ export async function fichaDeMiEmpresa(
     .eq("edicion_id", edicionId)
     .maybeSingle();
   return (data as FichaPortal | null) ?? null;
-}
-
-export function autorPortal(email: string) {
-  return `Portal: ${email}`;
 }
 
 // ---- Límites por persona y hora (anti-abuso) ----

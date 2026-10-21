@@ -5,7 +5,6 @@ import {
   DURACION_ENLACE_MS,
   EMAIL_REGEX,
   MAX_ENLACES_POR_HORA,
-  empresasDelEmail,
   generarToken,
   hashToken,
   idEdicionActiva,
@@ -17,7 +16,7 @@ import {
 export const runtime = "nodejs";
 
 const MENSAJE_GENERICO =
-  "Si ese email tiene entradas o es de una empresa patrocinadora, te hemos enviado un enlace para entrar. Revisa tu bandeja de entrada (y la carpeta de spam). El enlace caduca en 15 minutos.";
+  "Si ese email tiene entradas, te hemos enviado un enlace para entrar. Revisa tu bandeja de entrada (y la carpeta de spam). El enlace caduca en 15 minutos.";
 
 function construirEmailHtml(enlace: string) {
   return `
@@ -63,11 +62,9 @@ async function enviarEnlaceSiCorresponde(email: string, origen: string) {
     const edicionId = await idEdicionActiva(supabase);
     if (!edicionId) return;
 
-    const [conEntradas, empresas] = await Promise.all([
-      tieneEntradas(supabase, edicionId, email),
-      empresasDelEmail(supabase, edicionId, email),
-    ]);
-    if (!conEntradas && empresas.length === 0) return;
+    // Solo zona personal (entradas): las empresas entran con su usuario y
+    // contraseña, no con el email de un contacto.
+    if (!(await tieneEntradas(supabase, edicionId, email))) return;
 
     // Anti-abuso: como mucho MAX_ENLACES_POR_HORA envíos por email y hora.
     const haceUnaHora = new Date(Date.now() - 60 * 60 * 1000).toISOString();

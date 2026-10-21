@@ -1,16 +1,15 @@
 import { NextResponse, after } from "next/server";
 import { crearClienteServicio } from "@/lib/supabaseServidor";
-import { sesionPortal } from "@/lib/portal";
+import { autorEmpresa, claveAcciones, sesionEmpresa } from "@/lib/portalEmpresa";
 import { actualizarFichaComo } from "@/lib/patrocinadorArchivos";
 import {
   LIMITE_CAMBIOS_POR_HORA,
   MENSAJE_LIMITE,
   accionesUltimaHora,
-  autorPortal,
   avisarSecretaria,
   crearTareaRevision,
   edicionMaterial,
-  fichaDeMiEmpresa,
+  fichaDeLaSesion,
   nombreEmpresa,
   registrarAccion,
 } from "@/lib/portalMateriales";
@@ -27,13 +26,13 @@ const MAX_DURACION = 600;
 // Datos del ponente desde el portal. Solo si la ficha tiene "¿Tiene
 // ponencia?: Sí", y solo estos 4 campos.
 export async function POST(req: Request) {
-  const sesion = await sesionPortal();
+  const sesion = await sesionEmpresa();
   if (!sesion) return NextResponse.json({ error: "Tu sesión ha caducado. Vuelve a entrar." }, { status: 401 });
   const body = await req.json().catch(() => null);
 
   const supabase = crearClienteServicio();
   const edicion = await edicionMaterial(supabase);
-  const ficha = edicion ? await fichaDeMiEmpresa(supabase, edicion.id, sesion.email, body?.patrocinador_id) : null;
+  const ficha = edicion ? await fichaDeLaSesion(supabase, edicion.id, sesion.patrocinadorId) : null;
   if (!edicion || !ficha) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
   if (ficha.tiene_ponencia !== "Sí") {
     return NextResponse.json({ error: "Tu patrocinio no tiene ponencia." }, { status: 403 });
@@ -66,12 +65,12 @@ export async function POST(req: Request) {
   }
   if (Object.keys(cambios).length === 0) return NextResponse.json({ ok: true, sinCambios: true });
 
-  if ((await accionesUltimaHora(supabase, sesion.email, ["produccion", "ponente"])) >= LIMITE_CAMBIOS_POR_HORA) {
+  if ((await accionesUltimaHora(supabase, claveAcciones(sesion), ["produccion", "ponente"])) >= LIMITE_CAMBIOS_POR_HORA) {
     return NextResponse.json({ error: MENSAJE_LIMITE }, { status: 429 });
   }
   try {
-    await actualizarFichaComo(supabase, ficha.id, autorPortal(sesion.email), cambios);
-    await registrarAccion(supabase, sesion.email, "ponente", ficha.id);
+    await actualizarFichaComo(supabase, ficha.id, autorEmpresa(sesion), cambios);
+    await registrarAccion(supabase, claveAcciones(sesion), "ponente", ficha.id);
   } catch (e) {
     console.error("portal/materiales/ponente:", e instanceof Error ? e.message : e);
     return NextResponse.json({ error: "No se pudo guardar. Inténtalo de nuevo." }, { status: 500 });
@@ -80,7 +79,7 @@ export async function POST(req: Request) {
   const empresa = nombreEmpresa(ficha);
   const detalle = [
     `Empresa: ${empresa}`,
-    `Enviado por: ${sesion.email}`,
+    `Enviado por: ${autorEmpresa(sesion)}`,
     ...CAMPOS_TEXTO.map(({ clave, etiqueta }) => `${etiqueta}: ${nuevos[clave] ?? "—"}`),
     `Duración (minutos): ${nuevos.ponencia_duracion_min ?? "—"}`,
   ];

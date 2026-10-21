@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { eliminarPatrocinador } from "@/lib/apiCliente";
 import PatrocinadorForm from "@/components/PatrocinadorForm";
 import InvitadosPatrocinador from "@/components/InvitadosPatrocinador";
+import AccesoPatrocinador from "@/components/AccesoPatrocinador";
 import type { Patrocinador, PatrocinadorInput } from "@/types/database";
 
 export default function EditarPatrocinadorPage() {
@@ -96,6 +97,7 @@ export default function EditarPatrocinadorPage() {
 
       {!cargando && patrocinador && (
         <>
+          <AccesoPatrocinador patrocinadorId={patrocinador.id} />
           <InvitadosPatrocinador patrocinadorId={patrocinador.id} />
           <PatrocinadorForm
             historialEmail={{ tabla: "patrocinadores", edicionId: patrocinador.edicion_id, registroId: patrocinador.id }}

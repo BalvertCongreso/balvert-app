@@ -1,18 +1,17 @@
 import { NextResponse, after } from "next/server";
 import { crearClienteServicio } from "@/lib/supabaseServidor";
-import { sesionPortal } from "@/lib/portal";
+import { autorEmpresa, claveAcciones, sesionEmpresa } from "@/lib/portalEmpresa";
 import { actualizarFichaComo } from "@/lib/patrocinadorArchivos";
 import {
   LIMITE_CAMBIOS_POR_HORA,
   MAX_ROLLUPS,
   MENSAJE_LIMITE,
   accionesUltimaHora,
-  autorPortal,
   avisarSecretaria,
   crearTareaRevision,
   edicionMaterial,
   euros,
-  fichaDeMiEmpresa,
+  fichaDeLaSesion,
   nombreEmpresa,
   precioOfrecido,
   registrarAccion,
@@ -25,13 +24,13 @@ export const runtime = "nodejs";
 // rollups_solicitados, rollup_por_nuestra_cuenta y vinilado_por_nuestra_cuenta
 // (nada más de la ficha). No hay cobro online: Ariadna lo factura en Holded.
 export async function POST(req: Request) {
-  const sesion = await sesionPortal();
+  const sesion = await sesionEmpresa();
   if (!sesion) return NextResponse.json({ error: "Tu sesión ha caducado. Vuelve a entrar." }, { status: 401 });
   const body = await req.json().catch(() => null);
 
   const supabase = crearClienteServicio();
   const edicion = await edicionMaterial(supabase);
-  const ficha = edicion ? await fichaDeMiEmpresa(supabase, edicion.id, sesion.email, body?.patrocinador_id) : null;
+  const ficha = edicion ? await fichaDeLaSesion(supabase, edicion.id, sesion.patrocinadorId) : null;
   if (!edicion || !ficha) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
 
   const precioRollup = precioOfrecido(edicion.precio_rollup);
@@ -78,20 +77,20 @@ export async function POST(req: Request) {
 
   if (Object.keys(cambios).length === 0) return NextResponse.json({ ok: true, sinCambios: true });
 
-  if ((await accionesUltimaHora(supabase, sesion.email, ["produccion", "ponente"])) >= LIMITE_CAMBIOS_POR_HORA) {
+  if ((await accionesUltimaHora(supabase, claveAcciones(sesion), ["produccion", "ponente"])) >= LIMITE_CAMBIOS_POR_HORA) {
     return NextResponse.json({ error: MENSAJE_LIMITE }, { status: 429 });
   }
 
   try {
-    await actualizarFichaComo(supabase, ficha.id, autorPortal(sesion.email), cambios);
-    await registrarAccion(supabase, sesion.email, "produccion", ficha.id);
+    await actualizarFichaComo(supabase, ficha.id, autorEmpresa(sesion), cambios);
+    await registrarAccion(supabase, claveAcciones(sesion), "produccion", ficha.id);
   } catch (e) {
     console.error("portal/materiales/produccion:", e instanceof Error ? e.message : e);
     return NextResponse.json({ error: "No se pudo guardar. Inténtalo de nuevo." }, { status: 500 });
   }
 
   const empresa = nombreEmpresa(ficha);
-  const detalle = [`Empresa: ${empresa}`, `Pedido por: ${sesion.email}`, ...lineas];
+  const detalle = [`Empresa: ${empresa}`, `Pedido por: ${autorEmpresa(sesion)}`, ...lineas];
   try {
     await crearTareaRevision(
       supabase,

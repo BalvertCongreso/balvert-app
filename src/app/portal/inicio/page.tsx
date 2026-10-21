@@ -3,14 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import PortalMarco from "@/components/PortalMarco";
-import {
-  Aviso,
-  DocumentosOrganizacion,
-  SeccionMaterial,
-  SeccionPatrocinio,
-  obtenerMateriales,
-  type EmpresaMaterial,
-} from "./MaterialPatrocinador";
+import { Aviso } from "./MaterialPatrocinador";
 import { CAMPOS_FACTURACION, type DatosFacturacion } from "@/lib/factura";
 
 type Tabla = "congreso" | "gala" | "excursion";
@@ -49,7 +42,6 @@ interface DatosPortal {
   edicionNombre: string | null;
   entradas: EntradaPortal[];
   compras: CompraPortal[];
-  empresas: { empresa: string | null; categoria: string | null }[];
   documentos: DocumentoPortal[];
 }
 
@@ -258,31 +250,21 @@ function TarjetaCompra({ compra, onSolicitada }: { compra: CompraPortal; onSolic
   );
 }
 
-type Pestana = "entradas" | "patrocinio" | "material" | "documentos";
+// Zona personal (enlace al email). Lo de las empresas patrocinadoras está en
+// la zona de empresa (/portal/empresa), con su usuario y contraseña.
+type Pestana = "entradas" | "documentos";
 
 const PESTANAS: { id: Pestana; titulo: string; intro: string }[] = [
   {
     id: "entradas",
     titulo: "Mis entradas",
     intro:
-      "Aquí tienes tus entradas con su código QR (enséñalo en el móvil o impreso al llegar), el recibo de cada pago y la opción de pedir factura.",
-  },
-  {
-    id: "patrocinio",
-    titulo: "Mi patrocinio",
-    intro:
-      "Aquí tienes lo que incluye tu patrocinio y puedes pedirnos que te fabriquemos rollups o el vinilado del mostrador. Los precios no incluyen IVA y se facturan después.",
-  },
-  {
-    id: "material",
-    titulo: "Material",
-    intro:
-      "Aquí puedes enviarnos el logo, la ponencia y los diseños de rollup y vinilado. Cuando subas algo, nos llega un aviso y lo revisamos.",
+      "Aquí tienes tus entradas con su código QR (enséñalo en el móvil o impreso al llegar), tu certificado de asistencia después del congreso y, si las compraste, el recibo de cada pago y la opción de pedir factura.",
   },
   {
     id: "documentos",
     titulo: "Documentos",
-    intro: "Aquí encontrarás los documentos que la organización comparte contigo. Pulsa «Descargar» para guardarlos.",
+    intro: "Aquí encontrarás los documentos para asistentes y los que la organización comparte contigo. Pulsa «Descargar» para guardarlos.",
   },
 ];
 
@@ -305,9 +287,6 @@ function AreaCliente() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [datos, setDatos] = useState<DatosPortal | null>(null);
-  const [empresas, setEmpresas] = useState<EmpresaMaterial[] | null>(null);
-  const [errorEmpresas, setErrorEmpresas] = useState<string | null>(null);
-  const [empresaId, setEmpresaId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saliendo, setSaliendo] = useState(false);
 
@@ -323,19 +302,7 @@ function AreaCliente() {
         setDatos(data);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Error inesperado. Recarga la página."));
-    obtenerMateriales()
-      .then(setEmpresas)
-      .catch((e) => setErrorEmpresas(e instanceof Error ? e.message : "Error inesperado."));
   }, [router]);
-
-  const recargarEmpresas = () => {
-    obtenerMateriales()
-      .then((lista) => {
-        setEmpresas(lista);
-        setErrorEmpresas(null);
-      })
-      .catch((e) => setErrorEmpresas(e instanceof Error ? e.message : "Error inesperado."));
-  };
 
   async function salir() {
     setSaliendo(true);
@@ -371,27 +338,20 @@ function AreaCliente() {
     );
   }
 
-  const esPatrocinador = datos.empresas.length > 0;
   const tieneEntradas = datos.entradas.length > 0 || datos.compras.length > 0;
-  const tieneDocumentos = datos.documentos.length > 0 || (empresas ?? []).some((e) => e.organizacion.length > 0);
+  const tieneDocumentos = datos.documentos.length > 0;
 
-  // Qué pestañas ve cada persona: un patrocinador, todas; un asistente,
   // "Mis entradas" y "Documentos" (o solo la que tenga contenido).
   let visibles: Pestana[];
-  if (esPatrocinador) visibles = ["entradas", "patrocinio", "material", "documentos"];
-  else if (tieneEntradas && !tieneDocumentos) visibles = ["entradas"];
+  if (tieneEntradas && !tieneDocumentos) visibles = ["entradas"];
   else if (!tieneEntradas && tieneDocumentos) visibles = ["documentos"];
   else visibles = ["entradas", "documentos"];
 
   const pedida = searchParams.get("pestana") as Pestana | null;
-  const porDefecto: Pestana = esPatrocinador && !tieneEntradas ? "patrocinio" : visibles[0];
-  const pestana: Pestana = pedida && visibles.includes(pedida) ? pedida : porDefecto;
+  const pestana: Pestana = pedida && visibles.includes(pedida) ? pedida : visibles[0];
   const info = PESTANAS.find((p) => p.id === pestana)!;
 
   const irA = (p: Pestana) => router.replace(`/portal/inicio?pestana=${p}`, { scroll: false });
-
-  const empresa = empresas?.find((e) => e.id === empresaId) ?? empresas?.[0] ?? null;
-  const usaEmpresa = pestana === "patrocinio" || pestana === "material";
 
   return (
     <PortalMarco
@@ -431,47 +391,6 @@ function AreaCliente() {
 
       <h2 className="mb-1 text-lg font-semibold text-zinc-800">{info.titulo}</h2>
       <p className="mb-5 text-sm text-zinc-600">{info.intro}</p>
-
-      {usaEmpresa && empresas && empresas.length > 1 && (
-        <div className="mb-5">
-          <label className="campo-label" htmlFor="selector-empresa">
-            Empresa
-          </label>
-          <select
-            id="selector-empresa"
-            className="campo-input text-base sm:max-w-sm"
-            value={empresa?.id ?? ""}
-            onChange={(e) => setEmpresaId(e.target.value)}
-          >
-            {empresas.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.empresa ?? "Empresa sin nombre"}
-                {e.categoria ? ` (${e.categoria})` : ""}
-              </option>
-            ))}
-          </select>
-          <p className="mt-1 text-xs text-zinc-500">Eres contacto de varias empresas: elige con cuál quieres trabajar.</p>
-        </div>
-      )}
-
-      {usaEmpresa && (
-        <>
-          {errorEmpresas && <Aviso tipo="error">{errorEmpresas}</Aviso>}
-          {!empresas && !errorEmpresas && <p className="text-sm text-zinc-500">Cargando…</p>}
-          {empresa && (
-            <div className="mb-4 rounded-md bg-zinc-50 p-3 text-sm">
-              <p className="font-semibold text-zinc-800">{empresa.empresa ?? "Empresa patrocinadora"}</p>
-              {empresa.categoria && <p className="text-zinc-600">Patrocinio: {empresa.categoria}</p>}
-            </div>
-          )}
-          {empresa && pestana === "patrocinio" && (
-            <SeccionPatrocinio key={empresa.id} e={empresa} recargar={recargarEmpresas} />
-          )}
-          {empresa && pestana === "material" && (
-            <SeccionMaterial key={empresa.id} e={empresa} recargar={recargarEmpresas} irAPatrocinio={() => irA("patrocinio")} />
-          )}
-        </>
-      )}
 
       {pestana === "entradas" && (
         <div className="flex flex-col gap-8">
@@ -560,7 +479,6 @@ function AreaCliente() {
               ))}
             </ul>
           )}
-          {empresas && <DocumentosOrganizacion empresas={empresas} />}
         </div>
       )}
 

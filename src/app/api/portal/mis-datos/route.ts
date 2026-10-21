@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { crearClienteServicio } from "@/lib/supabaseServidor";
 import { construirDatosEntrada, type Tabla } from "@/lib/entradaDatos";
-import { consultaEntradas, documentosVisibles, empresasDelEmail, idEdicionActiva, sesionPortal } from "@/lib/portal";
+import { consultaEntradas, documentosVisibles, idEdicionActiva, sesionPortal } from "@/lib/portal";
 
 export const runtime = "nodejs";
 
@@ -124,7 +124,6 @@ export async function GET() {
     }
   }
 
-  const empresas = edicionId ? await empresasDelEmail(supabase, edicionId, sesion.email) : [];
   let documentos: { id: string; titulo: string; descripcion: string | null; nombre_archivo: string }[] = [];
   if (edicionId) {
     try {
@@ -144,7 +143,6 @@ export async function GET() {
       edicionNombre: edicion?.nombre ?? null,
       entradas,
       compras: [...compras.values()],
-      empresas: empresas.map((e) => ({ empresa: e.empresa, categoria: e.categoria })),
       documentos,
     },
     { headers: { "Cache-Control": "no-store" } }

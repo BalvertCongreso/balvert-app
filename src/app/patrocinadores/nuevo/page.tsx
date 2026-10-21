@@ -8,6 +8,7 @@ import { obtenerEdicionActiva } from "@/lib/edicionActiva";
 import PatrocinadorForm from "@/components/PatrocinadorForm";
 import InvitadosPatrocinador, { type InvitadoPendiente } from "@/components/InvitadosPatrocinador";
 import { llamarApiJson } from "@/lib/apiCliente";
+import { VentanaCredenciales } from "@/components/AccesoPatrocinador";
 import type { Edicion, PatrocinadorInput } from "@/types/database";
 
 export default function NuevoPatrocinadorPage() {
@@ -18,6 +19,10 @@ export default function NuevoPatrocinadorPage() {
   const [invitados, setInvitados] = useState<InvitadoPendiente[]>([]);
   const [categoria, setCategoria] = useState<string | null>(null);
   const [numIncluidas, setNumIncluidas] = useState<number | null>(null);
+  // Usuario y contraseña de la zona de empresa, creados al dar de alta: se
+  // enseñan una vez y al cerrar la ventana se sigue a la ficha o al listado.
+  const [credenciales, setCredenciales] = useState<{ usuario: string; contrasena: string } | null>(null);
+  const [destino, setDestino] = useState("/patrocinadores");
 
   useEffect(() => {
     obtenerEdicionActiva().then(setEdicion);
@@ -35,9 +40,11 @@ export default function NuevoPatrocinadorPage() {
       setError(error?.message ?? "No se pudo crear.");
       return;
     }
-    if (invitados.length === 0) {
-      router.push("/patrocinadores");
-      return;
+    let acceso: { usuario: string; contrasena: string } | null = null;
+    try {
+      acceso = await llamarApiJson("/api/patrocinadores/acceso", { patrocinador_id: creado.id, modo: "crear" });
+    } catch {
+      // Si falla, en la ficha sale el botón «Crear acceso».
     }
     // Los invitados apuntados se guardan (y se les manda la entrada) ahora que
     // ya hay ficha. Después se abre la ficha para ver cómo ha ido cada uno.
@@ -48,7 +55,13 @@ export default function NuevoPatrocinadorPage() {
         // El que falle no aparecerá en la lista de la ficha: se vuelve a añadir allí.
       }
     }
-    router.push(`/patrocinadores/${creado.id}`);
+    const siguiente = invitados.length > 0 || !acceso ? `/patrocinadores/${creado.id}` : "/patrocinadores";
+    if (acceso) {
+      setDestino(siguiente);
+      setCredenciales(acceso);
+    } else {
+      router.push(siguiente);
+    }
   }
 
   return (
@@ -75,6 +88,8 @@ export default function NuevoPatrocinadorPage() {
           No se pudo guardar: {error}
         </div>
       )}
+
+      {credenciales && <VentanaCredenciales credenciales={credenciales} onCerrar={() => router.push(destino)} />}
 
       <InvitadosPatrocinador
         pendientes={invitados}

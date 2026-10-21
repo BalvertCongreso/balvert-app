@@ -45,7 +45,7 @@ const RUTAS_SIN_AVISO = ["/entradas", "/restablecer-contrasena", "/inscripcion-c
 
 function modoDeRuta(pathname: string): Modo {
   if (pathname === "/portal" || pathname.startsWith("/portal/")) {
-    return pathname === "/portal/inicio" ? "portal" : null;
+    return pathname === "/portal/inicio" || pathname === "/portal/empresa" ? "portal" : null;
   }
   if (RUTAS_SIN_AVISO.some((r) => pathname === r || pathname.startsWith(r + "/"))) return null;
   return "panel";

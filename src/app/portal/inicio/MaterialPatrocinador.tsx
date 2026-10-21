@@ -15,9 +15,10 @@ import {
   type TipoArchivoPortal,
 } from "@/lib/patrocinadorArchivos";
 
-// Pestañas "Mi patrocinio" y "Material" de /portal/inicio, y los documentos
-// que el equipo comparte con cada empresa. Todo pasa por
-// /api/portal/materiales/*, que comprueba con la sesión que la empresa es suya.
+// Pestañas "Mi patrocinio" y "Material" de la zona de empresa
+// (/portal/empresa), y los documentos que el equipo comparte con la empresa.
+// Todo pasa por /api/portal/materiales/*, que decide la empresa con la sesión
+// de empresa (el patrocinador_id que se manda se ignora).
 
 interface ArchivoSubido {
   id: string;
@@ -92,7 +93,7 @@ async function enviarJson(url: string, body: unknown) {
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401) throw new Error("Tu sesión ha caducado. Recarga la página y vuelve a entrar con tu email.");
+  if (res.status === 401) throw new Error("Tu sesión ha caducado. Recarga la página y vuelve a entrar con el usuario y la contraseña de tu empresa.");
   if (!res.ok) throw new Error(data.error || "No se ha podido guardar. Inténtalo de nuevo en un momento.");
   return data;
 }

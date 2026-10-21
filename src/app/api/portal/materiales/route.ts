@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { crearClienteServicio } from "@/lib/supabaseServidor";
-import { empresasDelEmail, sesionPortal } from "@/lib/portal";
+import { sesionEmpresa } from "@/lib/portalEmpresa";
 import { COLUMNAS_FICHA_PORTAL, edicionMaterial, precioOfrecido, type FichaPortal } from "@/lib/portalMateriales";
 
 export const runtime = "nodejs";
@@ -12,18 +12,19 @@ const CAMPO_INCLUYE: Record<string, "incluye_diamante" | "incluye_oro" | "incluy
   "🥈 PLATA": "incluye_plata",
 };
 
-// Sección "Material para el congreso" de /portal/inicio: una entrada por cada
-// empresa de la que el email de la sesión es contacto. No acepta parámetros.
+// Pestañas "Mi patrocinio", "Material" y documentos de la zona de empresa
+// (/portal/empresa): la empresa de la sesión de empresa. No acepta parámetros.
 export async function GET() {
-  const sesion = await sesionPortal();
+  const sesion = await sesionEmpresa();
   if (!sesion) return NextResponse.json({ error: "Sesión no encontrada." }, { status: 401 });
 
   const supabase = crearClienteServicio();
   const edicion = await edicionMaterial(supabase);
   if (!edicion) return NextResponse.json({ empresas: [] });
 
-  const ids = (await empresasDelEmail(supabase, edicion.id, sesion.email)).map((e) => e.id);
-  if (ids.length === 0) return NextResponse.json({ empresas: [] });
+  // Una sola empresa: la de la sesión. Se deja en lista por compatibilidad
+  // con la pantalla (MaterialPatrocinador.tsx).
+  const ids = [sesion.patrocinadorId];
 
   const [{ data: fichas, error }, { data: archivos, error: errorArchivos }] = await Promise.all([
     supabase.from("patrocinadores").select(COLUMNAS_FICHA_PORTAL).in("id", ids).eq("edicion_id", edicion.id),

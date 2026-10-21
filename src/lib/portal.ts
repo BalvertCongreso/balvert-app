@@ -69,37 +69,6 @@ export async function idEdicionActiva(supabase: SupabaseClient): Promise<string 
   return data?.id ?? null;
 }
 
-export interface EmpresaPortal {
-  id: string;
-  empresa: string | null;
-  categoria: string | null;
-}
-
-// Empresas patrocinadoras de la edición activa en las que este email es
-// contacto 1 o contacto 2. Solo nombre y categoría: nada de facturación ni
-// datos internos de la ficha.
-export async function empresasDelEmail(
-  supabase: SupabaseClient,
-  edicionId: string,
-  email: string
-): Promise<EmpresaPortal[]> {
-  const patron = patronEmailExacto(email);
-  const [c1, c2] = await Promise.all(
-    ["contacto1_email", "contacto2_email"].map((campo) =>
-      supabase
-        .from("patrocinadores")
-        .select("id, empresa_entidad, categoria")
-        .eq("edicion_id", edicionId)
-        .ilike(campo, patron)
-    )
-  );
-  const porId = new Map<string, EmpresaPortal>();
-  for (const fila of [...(c1.data ?? []), ...(c2.data ?? [])]) {
-    porId.set(fila.id, { id: fila.id, empresa: fila.empresa_entidad, categoria: fila.categoria });
-  }
-  return [...porId.values()];
-}
-
 // ¿Tiene este email alguna entrada (con QR o sin él) en la edición activa?
 export async function tieneEntradas(supabase: SupabaseClient, edicionId: string, email: string): Promise<boolean> {
   const patron = patronEmailExacto(email);
@@ -162,37 +131,47 @@ export interface DocumentoPortal {
   ruta_archivo: string;
 }
 
-// Documentos de la edición activa que le corresponden a este email:
-// "todos_asistentes" si tiene alguna entrada, "todos_patrocinadores" si es
-// contacto de alguna empresa, los de "patrocinador" de SUS empresas y los de
-// "asistente" dirigidos a su email.
+// Documentos de la edición activa que le corresponden a este email (zona
+// personal): "todos_asistentes" si tiene alguna entrada y los de "asistente"
+// dirigidos a su email. Los de empresa van por la zona de empresa
+// (documentosEmpresa), con su propia sesión: ser contacto de una empresa ya
+// no da acceso a nada de ella desde aquí.
 export async function documentosVisibles(
   supabase: SupabaseClient,
   edicionId: string,
   email: string
 ): Promise<DocumentoPortal[]> {
-  const [conEntradas, empresas] = await Promise.all([
-    tieneEntradas(supabase, edicionId, email),
-    empresasDelEmail(supabase, edicionId, email),
-  ]);
+  const conEntradas = await tieneEntradas(supabase, edicionId, email);
   // Los documentos para una persona concreta (p. ej. su factura), por su
   // email. Va entre comillas dobles para que ningún carácter del email
   // cambie el sentido del filtro.
   const emailFiltro = `"${email.replace(/["\\]/g, (c) => `\\${c}`)}"`;
   const filtros: string[] = [`and(destino.eq.asistente,email_destinatario.eq.${emailFiltro})`];
   if (conEntradas) filtros.push("destino.eq.todos_asistentes");
-  if (empresas.length > 0) {
-    filtros.push("destino.eq.todos_patrocinadores");
-    // Ids que vienen de la base de datos (uuid), no del navegador.
-    filtros.push(`and(destino.eq.patrocinador,patrocinador_id.in.(${empresas.map((e) => e.id).join(",")}))`);
-  }
+  return consultarDocumentos(supabase, edicionId, filtros);
+}
 
+// Documentos de la zona de empresa: los de "todos_patrocinadores" y los de
+// "patrocinador" de ESTA empresa (la de la sesión de empresa).
+export async function documentosEmpresa(
+  supabase: SupabaseClient,
+  edicionId: string,
+  patrocinadorId: string
+): Promise<DocumentoPortal[]> {
+  // Id que viene de la sesión (base de datos), no del navegador.
+  return consultarDocumentos(supabase, edicionId, [
+    "destino.eq.todos_patrocinadores",
+    `and(destino.eq.patrocinador,patrocinador_id.eq.${patrocinadorId})`,
+  ]);
+}
+
+async function consultarDocumentos(supabase: SupabaseClient, edicionId: string, filtros: string[]) {
   const { data, error } = await supabase
     .from("documentos")
     .select("id, titulo, descripcion, nombre_archivo, ruta_archivo")
     .eq("edicion_id", edicionId)
     .or(filtros.join(","))
     .order("creado", { ascending: false });
-  if (error) throw new Error(`documentosVisibles: ${error.message}`);
-  return data ?? [];
+  if (error) throw new Error(`documentos del portal: ${error.message}`);
+  return (data ?? []) as DocumentoPortal[];
 }
