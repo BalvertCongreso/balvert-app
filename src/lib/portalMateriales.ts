@@ -11,7 +11,7 @@ import { idEdicionActiva } from "@/lib/portal";
 // Columnas de la ficha que el portal lee (y ninguna más: nada de
 // facturación, contactos ni observaciones internas).
 export const COLUMNAS_FICHA_PORTAL =
-  "id, empresa_entidad, categoria, tiene_stand, tiene_ponencia, ponente_nombre, ponente_cargo, ponencia_titulo, ponencia_duracion_min, rollups_solicitados, rollup_por_nuestra_cuenta, vinilado_por_nuestra_cuenta, beneficios_incluidos, beneficios_excluidos, logo_recibido, ponencia_recibida, fecha_limite_materiales";
+  "id, empresa_entidad, categoria, tiene_stand, tiene_ponencia, ponente_nombre, ponente_cargo, ponente_email, ponente_telefono, ponencia_titulo, ponencia_duracion_min, rollups_solicitados, rollup_por_nuestra_cuenta, vinilado_por_nuestra_cuenta, beneficios_incluidos, beneficios_excluidos, logo_recibido, ponencia_recibida, fecha_limite_materiales";
 
 export interface FichaPortal {
   id: string;
@@ -21,6 +21,8 @@ export interface FichaPortal {
   tiene_ponencia: string | null;
   ponente_nombre: string | null;
   ponente_cargo: string | null;
+  ponente_email: string | null;
+  ponente_telefono: string | null;
   ponencia_titulo: string | null;
   ponencia_duracion_min: number | null;
   rollups_solicitados: number | null;

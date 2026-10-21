@@ -85,6 +85,8 @@ export interface Patrocinador {
   tiene_ponencia: SiNoNA | null;
   ponente_nombre: string | null;
   ponente_cargo: string | null;
+  ponente_email: string | null;
+  ponente_telefono: string | null;
   ponencia_titulo: string | null;
   ponencia_duracion_min: number | null;
   ponencia_recibida: SiNo | null;

@@ -67,9 +67,17 @@ export const seccionesPatrocinador: SeccionDef[] = [
   {
     titulo: "Ponencia",
     campos: [
-      { key: "tiene_ponencia", label: "¿Tiene ponencia?", tipo: "select", opciones: ["Sí", "No", "N/A"] },
+      {
+        key: "tiene_ponencia",
+        label: "¿Tiene ponencia?",
+        tipo: "select",
+        opciones: ["Sí", "No", "N/A"],
+        nota: "Diamante y Oro lo responden ellos desde su zona (y rellenan los datos del ponente). En las demás categorías lo decides tú.",
+      },
       { key: "ponente_nombre", label: "Ponente — Nombre", tipo: "texto" },
       { key: "ponente_cargo", label: "Ponente — Cargo", tipo: "texto" },
+      { key: "ponente_email", label: "Ponente — Email", tipo: "email" },
+      { key: "ponente_telefono", label: "Ponente — Teléfono", tipo: "telefono" },
       { key: "ponencia_titulo", label: "Título de la ponencia", tipo: "texto" },
       { key: "ponencia_duracion_min", label: "Duración (minutos)", tipo: "numero" },
       { key: "ponencia_recibida", label: "Ponencia recibida", tipo: "select", opciones: ["Sí", "No"] },

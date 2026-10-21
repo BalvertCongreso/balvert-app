@@ -40,6 +40,8 @@ export interface ArchivoOrganizacion {
 interface Ponente {
   ponente_nombre: string | null;
   ponente_cargo: string | null;
+  ponente_email: string | null;
+  ponente_telefono: string | null;
   ponencia_titulo: string | null;
   ponencia_duracion_min: number | null;
 }
@@ -64,6 +66,12 @@ export interface EmpresaMaterial {
     rollupsSolicitados: number;
     rollupPorNuestraCuenta: boolean;
     vinilado: boolean;
+  };
+  ponencia: {
+    decideEmpresa: boolean;
+    respuesta: "Sí" | "No" | null;
+    maxMinutos: number | null;
+    explicacion: string | null;
   };
   ponente: Ponente | null;
   subidos: ArchivoSubido[];
@@ -360,7 +368,9 @@ function FechaLimite({ iso }: { iso: string }) {
 }
 
 function ponenteCompleto(p: Ponente | null) {
-  return Boolean(p && p.ponente_nombre && p.ponente_cargo && p.ponencia_titulo && p.ponencia_duracion_min);
+  return Boolean(
+    p && p.ponente_nombre && p.ponente_cargo && p.ponente_email && p.ponente_telefono && p.ponencia_titulo && p.ponencia_duracion_min
+  );
 }
 
 export function SeccionMaterial({
@@ -382,6 +392,11 @@ export function SeccionMaterial({
           <li className="flex items-center justify-between gap-3">
             Logo <Etiqueta bien={e.estado.logoRecibido}>{e.estado.logoRecibido ? "Recibido" : "Pendiente"}</Etiqueta>
           </li>
+          {e.ponencia.decideEmpresa && !e.ponencia.respuesta && (
+            <li className="flex items-center justify-between gap-3">
+              ¿Vais a hacer ponencia? <Etiqueta bien={false}>Falta responder</Etiqueta>
+            </li>
+          )}
           {e.estado.tienePonencia && (
             <>
               <li className="flex items-center justify-between gap-3">
@@ -418,7 +433,11 @@ export function SeccionMaterial({
 
       <Subir e={e} onSubido={recargar} />
       <Subidos e={e} onBorrado={recargar} />
-      {e.ponente && <DatosPonente e={e} ponente={e.ponente} onGuardado={recargar} />}
+      {e.ponencia.decideEmpresa ? (
+        <PonenciaEmpresa key={e.id} e={e} onGuardado={recargar} />
+      ) : (
+        e.ponente && <DatosPonente e={e} ponente={e.ponente} onGuardado={recargar} />
+      )}
     </div>
   );
 }
@@ -672,10 +691,82 @@ function Subidos({ e, onBorrado }: { e: EmpresaMaterial; onBorrado: () => void }
   );
 }
 
-function DatosPonente({ e, ponente, onGuardado }: { e: EmpresaMaterial; ponente: Ponente; onGuardado: () => void }) {
+// Diamante y Oro: «¿Vais a hacer ponencia?» y, si es que sí, los datos.
+function PonenciaEmpresa({ e, onGuardado }: { e: EmpresaMaterial; onGuardado: () => void }) {
+  const [respuesta, setRespuesta] = useState<"Sí" | "No" | null>(e.ponencia.respuesta);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function responderNo() {
+    if (!window.confirm("¿Confirmas que no vais a hacer ponencia? Podréis cambiarlo más adelante.")) return;
+    setError(null);
+    setGuardando(true);
+    try {
+      await enviarJson("/api/portal/materiales/ponente", { tiene_ponencia: "No" });
+      setRespuesta("No");
+      onGuardado();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se ha podido guardar.");
+    }
+    setGuardando(false);
+  }
+
+  const opcion = (valor: "Sí" | "No", texto: string) => (
+    <button
+      type="button"
+      disabled={guardando}
+      onClick={() => (valor === "No" ? (e.ponencia.respuesta === "No" ? setRespuesta("No") : responderNo()) : setRespuesta("Sí"))}
+      aria-pressed={respuesta === valor}
+      className={`min-h-11 rounded-md border px-5 py-2 text-sm font-semibold ${
+        respuesta === valor
+          ? "border-[var(--balvert-azul-oscuro)] bg-sky-50 text-[var(--balvert-azul-oscuro)]"
+          : "border-[var(--borde)] text-zinc-700 hover:bg-zinc-50"
+      }`}
+    >
+      {texto}
+    </button>
+  );
+
+  return (
+    <Bloque titulo="Ponencia" ayuda={e.ponencia.explicacion ?? undefined}>
+      <p className="mb-2 text-sm font-semibold text-zinc-800">¿Vais a hacer ponencia?</p>
+      <div className="mb-3 flex gap-2">
+        {opcion("Sí", "Sí")}
+        {opcion("No", "No")}
+      </div>
+      {error && <Aviso tipo="error">{error}</Aviso>}
+      {respuesta === "No" && e.ponencia.respuesta === "No" && (
+        <p className="text-sm text-zinc-600">Nos habéis dicho que no haréis ponencia. Si cambiáis de idea, pulsad «Sí».</p>
+      )}
+      {respuesta === "Sí" && e.ponente && (
+        <div className="mt-2">
+          <DatosPonente e={e} ponente={e.ponente} onGuardado={onGuardado} conRespuesta sinMarco />
+        </div>
+      )}
+    </Bloque>
+  );
+}
+
+function DatosPonente({
+  e,
+  ponente,
+  onGuardado,
+  conRespuesta = false,
+  sinMarco = false,
+}: {
+  e: EmpresaMaterial;
+  ponente: Ponente;
+  onGuardado: () => void;
+  // Diamante/Oro: al guardar también se responde «Sí» a la ponencia.
+  conRespuesta?: boolean;
+  sinMarco?: boolean;
+}) {
+  const maxMinutos = e.ponencia.maxMinutos ?? 600;
   const [valores, setValores] = useState({
     ponente_nombre: ponente.ponente_nombre ?? "",
     ponente_cargo: ponente.ponente_cargo ?? "",
+    ponente_email: ponente.ponente_email ?? "",
+    ponente_telefono: ponente.ponente_telefono ?? "",
     ponencia_titulo: ponente.ponencia_titulo ?? "",
     ponencia_duracion_min: ponente.ponencia_duracion_min != null ? String(ponente.ponencia_duracion_min) : "",
   });
@@ -689,7 +780,11 @@ function DatosPonente({ e, ponente, onGuardado }: { e: EmpresaMaterial; ponente:
     setOk(false);
     const duracion = valores.ponencia_duracion_min.trim();
     if (duracion !== "" && !/^\d+$/.test(duracion)) {
-      setError("En «Duración» escribe solo el número de minutos, sin decimales (por ejemplo, 15).");
+      setError("En «Duración» escribe solo el número de minutos, sin decimales (por ejemplo, 10).");
+      return;
+    }
+    if (duracion !== "" && Number(duracion) > maxMinutos) {
+      setError(`La duración máxima de vuestra ponencia es de ${maxMinutos} minutos.`);
       return;
     }
     setGuardando(true);
@@ -698,7 +793,10 @@ function DatosPonente({ e, ponente, onGuardado }: { e: EmpresaMaterial; ponente:
         patrocinador_id: e.id,
         ponente_nombre: valores.ponente_nombre,
         ponente_cargo: valores.ponente_cargo,
+        ponente_email: valores.ponente_email,
+        ponente_telefono: valores.ponente_telefono,
         ponencia_titulo: valores.ponencia_titulo,
+        ...(conRespuesta ? { tiene_ponencia: "Sí" } : {}),
         ponencia_duracion_min: duracion === "" ? null : Number(duracion),
       });
       setOk(true);
@@ -718,7 +816,7 @@ function DatosPonente({ e, ponente, onGuardado }: { e: EmpresaMaterial; ponente:
         id={`${clave}-${e.id}`}
         type={tipo}
         className="campo-input text-base"
-        maxLength={tipo === "text" ? max : undefined}
+        maxLength={tipo !== "number" ? max : undefined}
         min={tipo === "number" ? 1 : undefined}
         max={tipo === "number" ? max : undefined}
         inputMode={tipo === "number" ? "numeric" : undefined}
@@ -729,18 +827,25 @@ function DatosPonente({ e, ponente, onGuardado }: { e: EmpresaMaterial; ponente:
     </div>
   );
 
-  return (
-    <Bloque
-      titulo="Datos del ponente"
-      ayuda="Cuéntanos quién dará la ponencia y de qué tratará. Lo usaremos para el programa. Puedes cambiarlo más adelante."
-    >
+  const formulario = (
       <form onSubmit={guardar} className="grid gap-4 sm:grid-cols-2">
         {campo("ponente_nombre", "Nombre y apellidos del ponente", "Tal y como quieres que aparezca en el programa.", 200)}
         {campo("ponente_cargo", "Cargo", "Por ejemplo: Director técnico.", 200)}
+        {campo("ponente_email", "Email del ponente", "Para escribirle sobre la ponencia.", 200, "email")}
+        {campo("ponente_telefono", "Teléfono del ponente", "Por si tenemos que localizarle el día del congreso.", 40, "tel")}
         <div className="sm:col-span-2">
           {campo("ponencia_titulo", "Título de la ponencia", "Si aún no es definitivo, pon uno provisional.", 300)}
         </div>
-        {campo("ponencia_duracion_min", "Duración (minutos)", "Solo el número, por ejemplo 15.", 600, "number")}
+        {campo(
+          "ponencia_duracion_min",
+          "Duración (minutos)",
+          e.ponencia.maxMinutos ? `Máximo ${e.ponencia.maxMinutos} minutos.` : "Solo el número, por ejemplo 15.",
+          maxMinutos,
+          "number"
+        )}
+        <p className="self-end text-xs text-zinc-500 sm:pb-6">
+          La presentación se sube arriba, en «Enviarnos un archivo» → «Ponencia (presentación)».
+        </p>
         <div className="flex flex-col gap-3 sm:col-span-2">
           {error && <Aviso tipo="error">{error}</Aviso>}
           {ok && <Aviso tipo="ok">Datos del ponente guardados. Gracias.</Aviso>}
@@ -751,6 +856,14 @@ function DatosPonente({ e, ponente, onGuardado }: { e: EmpresaMaterial; ponente:
           </div>
         </div>
       </form>
+  );
+  if (sinMarco) return formulario;
+  return (
+    <Bloque
+      titulo="Datos del ponente"
+      ayuda="Cuéntanos quién dará la ponencia y de qué tratará. Lo usaremos para el programa. Puedes cambiarlo más adelante."
+    >
+      {formulario}
     </Bloque>
   );
 }

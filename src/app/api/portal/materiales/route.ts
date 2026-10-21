@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { crearClienteServicio } from "@/lib/supabaseServidor";
 import { sesionEmpresa } from "@/lib/portalEmpresa";
+import { PONENCIA_POR_CATEGORIA } from "@/lib/datosEmpresa";
 import { COLUMNAS_FICHA_PORTAL, edicionMaterial, precioOfrecido, type FichaPortal } from "@/lib/portalMateriales";
 
 export const runtime = "nodejs";
@@ -73,14 +74,25 @@ export async function GET() {
         rollupPorNuestraCuenta: f.rollup_por_nuestra_cuenta === "Sí",
         vinilado: f.vinilado_por_nuestra_cuenta === "Sí",
       },
-      ponente: tienePonencia
-        ? {
-            ponente_nombre: f.ponente_nombre,
-            ponente_cargo: f.ponente_cargo,
-            ponencia_titulo: f.ponencia_titulo,
-            ponencia_duracion_min: f.ponencia_duracion_min,
-          }
-        : null,
+      // Diamante y Oro deciden ellos si hacen ponencia (y la rellenan); en las
+      // demás categorías solo se rellena si la organización ha puesto Sí.
+      ponencia: {
+        decideEmpresa: Boolean(f.categoria && PONENCIA_POR_CATEGORIA[f.categoria]),
+        respuesta: f.tiene_ponencia === "Sí" || f.tiene_ponencia === "No" ? f.tiene_ponencia : null,
+        maxMinutos: f.categoria ? PONENCIA_POR_CATEGORIA[f.categoria]?.maxMinutos ?? null : null,
+        explicacion: f.categoria ? PONENCIA_POR_CATEGORIA[f.categoria]?.explicacion ?? null : null,
+      },
+      ponente:
+        tienePonencia || (f.categoria && PONENCIA_POR_CATEGORIA[f.categoria])
+          ? {
+              ponente_nombre: f.ponente_nombre,
+              ponente_cargo: f.ponente_cargo,
+              ponente_email: f.ponente_email,
+              ponente_telefono: f.ponente_telefono,
+              ponencia_titulo: f.ponencia_titulo,
+              ponencia_duracion_min: f.ponencia_duracion_min,
+            }
+          : null,
       subidos: deEstaEmpresa
         .filter((a) => a.origen === "patrocinador")
         .map((a) => ({

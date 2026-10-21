@@ -11,6 +11,7 @@ import {
   obtenerMateriales,
   type EmpresaMaterial,
 } from "../inicio/MaterialPatrocinador";
+import { DatosEmpresa, InvitacionesEmpresa } from "./SeccionesEmpresa";
 
 // Zona de empresa del portal: se entra con el usuario y la contraseña de la
 // empresa (ver src/lib/portalEmpresa.ts). Todo lo que se lee y guarda aquí
@@ -26,7 +27,7 @@ interface DatosEmpresa {
   documentos: { id: string; titulo: string; descripcion: string | null; nombre_archivo: string }[];
 }
 
-type Pestana = "patrocinio" | "material" | "documentos" | "acceso";
+type Pestana = "patrocinio" | "invitaciones" | "material" | "documentos" | "datos" | "acceso";
 
 const PESTANAS: { id: Pestana; titulo: string; intro: string }[] = [
   {
@@ -34,6 +35,12 @@ const PESTANAS: { id: Pestana; titulo: string; intro: string }[] = [
     titulo: "Mi patrocinio",
     intro:
       "Aquí tienes lo que incluye tu patrocinio y puedes pedirnos que te fabriquemos rollups o el vinilado del mostrador. Los precios no incluyen IVA y se facturan después.",
+  },
+  {
+    id: "invitaciones",
+    titulo: "Invitaciones",
+    intro:
+      "Aquí tenéis a todos vuestros invitados. Podéis añadir a los que faltan (les enviamos su entrada al momento), descargar sus entradas para repartirlas y quitar o cambiar invitados.",
   },
   {
     id: "material",
@@ -45,6 +52,11 @@ const PESTANAS: { id: Pestana; titulo: string; intro: string }[] = [
     id: "documentos",
     titulo: "Documentos",
     intro: "Aquí encontrarás los documentos que la organización comparte con tu empresa. Pulsa «Descargar» para guardarlos.",
+  },
+  {
+    id: "datos",
+    titulo: "Datos de la empresa",
+    intro: "Aquí podéis cambiar vuestras personas de contacto y los datos de facturación.",
   },
   {
     id: "acceso",
@@ -231,6 +243,8 @@ function ZonaEmpresa() {
         </div>
       )}
 
+      {pestana === "invitaciones" && <InvitacionesEmpresa />}
+      {pestana === "datos" && <DatosEmpresa />}
       {pestana === "acceso" && <CambiarContrasena />}
 
       <Contacto />

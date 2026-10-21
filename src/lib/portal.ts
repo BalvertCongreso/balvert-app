@@ -103,13 +103,13 @@ export async function sesionPortal(): Promise<SesionPortal | null> {
   return { email: data.email };
 }
 
-// Columnas que necesita construirDatosEntrada, y ninguna más: el documento
-// de identidad (y el resto de datos internos de la fila) no se leen nunca
-// desde el portal.
+// Columnas que necesita construirDatosEntrada y «Editar mis datos» (teléfono,
+// alergias, check-in), y ninguna más: el documento de identidad (y el resto
+// de datos internos de la fila) no se leen nunca desde el portal.
 export const COLUMNAS_ENTRADA: Record<Tabla, string> = {
-  congreso: "id, nombre, tipo_acceso, empresa_entidad, categoria_patrocinio, edicion_id, qr_codigo, recibo_url, referencia_pago_online, check_in_hecho",
-  gala: "id, nombre_asistente, menu, empresa_entidad, categoria_patrocinio, edicion_id, qr_codigo, recibo_url, referencia_pago_online",
-  excursion: "id, nombre_asistente, tipo_entrada, empresa_entidad, categoria_patrocinio, edicion_id, qr_codigo, recibo_url, referencia_pago_online",
+  congreso: "id, nombre, telefono, tipo_acceso, empresa_entidad, categoria_patrocinio, edicion_id, qr_codigo, recibo_url, referencia_pago_online, check_in_hecho",
+  gala: "id, nombre_asistente, menu, alergias_intolerancias, empresa_entidad, categoria_patrocinio, edicion_id, qr_codigo, recibo_url, referencia_pago_online, check_in_hecho",
+  excursion: "id, nombre_asistente, tipo_entrada, empresa_entidad, categoria_patrocinio, edicion_id, qr_codigo, recibo_url, referencia_pago_online, check_in_hecho",
 };
 
 // Consulta base de las entradas de un email en la edición activa. Quien la

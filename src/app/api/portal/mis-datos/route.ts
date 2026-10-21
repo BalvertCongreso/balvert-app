@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { crearClienteServicio } from "@/lib/supabaseServidor";
-import { construirDatosEntrada, type Tabla } from "@/lib/entradaDatos";
-import { consultaEntradas, documentosVisibles, idEdicionActiva, sesionPortal } from "@/lib/portal";
+import { NOMBRE_TABLA_SQL, construirDatosEntrada, type Tabla } from "@/lib/entradaDatos";
+import { CAMPO_EMAIL, consultaEntradas, documentosVisibles, idEdicionActiva, patronEmailExacto, sesionPortal } from "@/lib/portal";
 
 export const runtime = "nodejs";
 
@@ -48,6 +48,15 @@ export async function GET() {
     // Solo Congreso: "disponible" con el check-in hecho, "pendiente" antes,
     // "sin_nombre" si falta el nombre para imprimirlo. null en Gala/Excursión.
     certificado: "disponible" | "pendiente" | "sin_nombre" | null;
+    // Para «Editar mis datos». Del documento solo si hay uno guardado: el
+    // número no sale nunca hacia el navegador.
+    edicion: {
+      checkIn: boolean;
+      tieneDocumento: boolean;
+      telefono?: string | null;
+      menu?: string | null;
+      alergias?: string | null;
+    };
   }[] = [];
   // Compras online (las que tienen referencia de pago de Stripe).
   const compras = new Map<string, CompraPortal>();
@@ -59,6 +68,13 @@ export async function GET() {
         console.error(`portal/mis-datos: fallo leyendo ${tabla}`, error.code, error.message);
         return NextResponse.json({ error: "No se pudieron cargar tus datos." }, { status: 500 });
       }
+      const { data: conDocumento } = await supabase
+        .from(NOMBRE_TABLA_SQL[tabla])
+        .select("id")
+        .eq("edicion_id", edicionId)
+        .ilike(CAMPO_EMAIL[tabla], patronEmailExacto(sesion.email))
+        .not("documento_identidad", "is", null);
+      const idsConDocumento = new Set((conDocumento ?? []).map((f) => f.id as string));
       for (const fila of (filas ?? []) as unknown as Record<string, unknown>[]) {
         const datos = await construirDatosEntrada(supabase, tabla, fila);
         entradas.push({
@@ -79,6 +95,14 @@ export async function GET() {
                 : typeof fila.nombre === "string" && fila.nombre.trim()
                   ? "disponible"
                   : "sin_nombre",
+          edicion: {
+            checkIn: fila.check_in_hecho === "Sí",
+            tieneDocumento: idsConDocumento.has(fila.id as string),
+            ...(tabla === "congreso" ? { telefono: (fila.telefono as string | null) ?? null } : {}),
+            ...(tabla === "gala"
+              ? { menu: (fila.menu as string | null) ?? null, alergias: (fila.alergias_intolerancias as string | null) ?? null }
+              : {}),
+          },
         });
 
         const referencia = fila.referencia_pago_online as string | null;

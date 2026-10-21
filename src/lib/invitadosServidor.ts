@@ -1,8 +1,9 @@
 // Alta, listado y baja de invitados de un patrocinador (Congreso y, en
 // Diamante, cena de gala y excursión). Solo servidor. Lo usan la ficha del
 // patrocinador en el panel (/api/patrocinadores/invitados, con la sesión del
-// panel: el historial sale con su nombre) y, más adelante, la zona de la
-// empresa en el portal. El cliente de Supabase lo decide quien llama.
+// panel: el historial sale con su nombre) y la zona de la empresa en el
+// portal (/api/portal/empresa/invitados, clave de servicio y autor "Portal:
+// <usuario>" en el historial). El cliente de Supabase lo decide quien llama.
 import { randomUUID } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { construirDatosEntrada, type Tabla } from "@/lib/entradaDatos";
@@ -42,6 +43,34 @@ export async function leerPatrocinador(supabase: SupabaseClient, id: string): Pr
 }
 
 type Fila = Record<string, unknown>;
+
+// Escrituras en Congreso/Gala/Excursión. Con autor (portal, clave de
+// servicio) van por las funciones de la migración 031, que lo dejan en el
+// historial; sin autor, directas con la sesión del panel.
+async function insertarFila(supabase: SupabaseClient, sql: string, fila: Fila, autor?: string): Promise<Fila> {
+  if (autor) {
+    const { data, error } = await supabase.rpc("insertar_entrada_como", { p_tabla: sql, p_autor: autor, p_fila: fila });
+    if (error || !data) throw new Error(error?.message ?? "sin datos");
+    return data as Fila;
+  }
+  const { data, error } = await supabase.from(sql).insert(fila).select("*").single();
+  if (error || !data) throw new Error(error?.message ?? "sin datos");
+  return data;
+}
+
+async function actualizarFila(supabase: SupabaseClient, sql: string, id: string, campos: Fila, autor?: string) {
+  const { error } = autor
+    ? await supabase.rpc("actualizar_entrada_como", { p_tabla: sql, p_id: id, p_autor: autor, p_campos: campos })
+    : await supabase.from(sql).update(campos).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+async function borrarFila(supabase: SupabaseClient, sql: string, id: string, autor?: string) {
+  const { error } = autor
+    ? await supabase.rpc("borrar_entrada_como", { p_tabla: sql, p_id: id, p_autor: autor })
+    : await supabase.from(sql).delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
 
 function estadoDe(fila: Fila): EstadoEntrada {
   if (!fila.qr_codigo) return "sin_generar";
@@ -166,7 +195,7 @@ export async function anadirInvitado(
   supabase: SupabaseClient,
   patrocinador: PatrocinadorInvitaciones,
   datos: DatosNuevoInvitado,
-  opciones: { enviar: boolean; limitar: boolean }
+  opciones: { enviar: boolean; limitar: boolean; autor?: string }
 ): Promise<ResultadoAlta> {
   const esDiamante = patrocinador.categoria === CATEGORIA_DIAMANTE;
   if ((datos.gala || datos.excursion) && !esDiamante) {
@@ -196,9 +225,11 @@ export async function anadirInvitado(
 
   const creadas: { tabla: Tabla; fila: Fila }[] = [];
   async function insertar(tabla: Tabla, sql: string, fila: Fila) {
-    const { data, error } = await supabase.from(sql).insert(fila).select("*").single();
-    if (error || !data) throw new Error(`No se pudo guardar el invitado (${tabla}): ${error?.message ?? "sin datos"}`);
-    creadas.push({ tabla, fila: data });
+    try {
+      creadas.push({ tabla, fila: await insertarFila(supabase, sql, fila, opciones.autor) });
+    } catch (e) {
+      throw new Error(`No se pudo guardar el invitado (${tabla}): ${e instanceof Error ? e.message : e}`);
+    }
   }
 
   try {
@@ -232,13 +263,13 @@ export async function anadirInvitado(
   } catch (e) {
     // Sin filas a medias: si falla una, se deshacen las ya creadas.
     for (const c of creadas) {
-      await supabase.from(TABLA_SQL[c.tabla]).delete().eq("id", c.fila.id as string);
+      await borrarFila(supabase, TABLA_SQL[c.tabla], c.fila.id as string, opciones.autor).catch(() => null);
     }
     throw e;
   }
 
   if (!opciones.enviar) return { clave: datos.email, enviado: null };
-  const envio = await enviarEntradas(supabase, patrocinador, datos.email, creadas);
+  const envio = await enviarEntradas(supabase, patrocinador, datos.email, creadas, opciones.autor);
   return { clave: datos.email, enviado: envio.enviado, errorEnvio: envio.error };
 }
 
@@ -247,7 +278,8 @@ async function enviarEntradas(
   supabase: SupabaseClient,
   patrocinador: PatrocinadorInvitaciones,
   email: string,
-  filas: { tabla: Tabla; fila: Fila }[]
+  filas: { tabla: Tabla; fila: Fila }[],
+  autor?: string
 ) {
   const entradas: EntradaParaEmail[] = await Promise.all(
     filas.map(async ({ tabla, fila }) => ({
@@ -264,7 +296,7 @@ async function enviarEntradas(
   );
   if (resultado.enviado) {
     for (const { tabla, fila } of filas) {
-      await supabase.from(TABLA_SQL[tabla]).update({ entrada_enviada: "Sí" }).eq("id", fila.id as string);
+      await actualizarFila(supabase, TABLA_SQL[tabla], fila.id as string, { entrada_enviada: "Sí" }, autor);
     }
   }
   return resultado;
@@ -275,7 +307,8 @@ async function enviarEntradas(
 export async function quitarInvitado(
   supabase: SupabaseClient,
   patrocinador: PatrocinadorInvitaciones,
-  clave: string
+  clave: string,
+  autor?: string
 ) {
   const { invitados } = await listarInvitados(supabase, patrocinador);
   const inv = invitados.find((i) => i.clave === clave);
@@ -284,8 +317,11 @@ export async function quitarInvitado(
   for (const tabla of ["congreso", "gala", "excursion"] as const) {
     const entrada = inv[tabla];
     if (!entrada) continue;
-    const { error } = await supabase.from(TABLA_SQL[tabla]).delete().eq("id", entrada.id);
-    if (error) throw new Error("No se pudo quitar al invitado: " + error.message);
+    try {
+      await borrarFila(supabase, TABLA_SQL[tabla], entrada.id, autor);
+    } catch (e) {
+      throw new Error("No se pudo quitar al invitado: " + (e instanceof Error ? e.message : e));
+    }
   }
   return inv;
 }

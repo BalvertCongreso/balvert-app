@@ -5,6 +5,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import PortalMarco from "@/components/PortalMarco";
 import { Aviso } from "./MaterialPatrocinador";
 import { CAMPOS_FACTURACION, type DatosFacturacion } from "@/lib/factura";
+import {
+  AYUDA_DOCUMENTO,
+  TIPOS_DOCUMENTO,
+  esTipoDocumento,
+  nombreTieneApellidos,
+  validarDocumento,
+} from "@/lib/documentoIdentidad";
+import { MENUS_GALA } from "@/lib/invitados";
 
 type Tabla = "congreso" | "gala" | "excursion";
 
@@ -19,6 +27,13 @@ interface EntradaPortal {
   detalleValor: string | null;
   generada: boolean;
   certificado: "disponible" | "pendiente" | "sin_nombre" | null;
+  edicion: {
+    checkIn: boolean;
+    tieneDocumento: boolean;
+    telefono?: string | null;
+    menu?: string | null;
+    alergias?: string | null;
+  };
 }
 
 interface CompraPortal {
@@ -52,12 +67,15 @@ const GRUPOS: { tabla: Tabla; titulo: string }[] = [
 ];
 
 function urlEntrada(e: EntradaPortal, descargar: boolean) {
-  const params = new URLSearchParams({ tabla: e.tabla, id: e.id });
+  // "v": cambia con los datos, para que el navegador no enseñe la imagen
+  // anterior después de editarlos.
+  const params = new URLSearchParams({ tabla: e.tabla, id: e.id, v: `${e.nombre ?? ""}|${e.detalleValor ?? ""}` });
   if (descargar) params.set("descargar", "1");
   return `/api/portal/entrada?${params}`;
 }
 
-function TarjetaEntrada({ entrada }: { entrada: EntradaPortal }) {
+function TarjetaEntrada({ entrada, onEditada }: { entrada: EntradaPortal; onEditada: () => void }) {
+  const [editando, setEditando] = useState(false);
   return (
     <div className="flex flex-col gap-3 rounded-md border border-[var(--borde)] p-4 sm:flex-row">
       {entrada.generada ? (
@@ -89,8 +107,188 @@ function TarjetaEntrada({ entrada }: { entrada: EntradaPortal }) {
           <p className="mt-2 text-zinc-500">Tu entrada aún no está lista. Te avisaremos por email.</p>
         )}
         {entrada.certificado && <Certificado entrada={entrada} />}
+        {editando ? (
+          <EditarMisDatos
+            entrada={entrada}
+            onCerrar={() => setEditando(false)}
+            onGuardado={() => {
+              setEditando(false);
+              onEditada();
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditando(true)}
+            className="mt-3 self-start text-sm font-medium text-[var(--balvert-azul-oscuro)] underline"
+          >
+            Editar mis datos
+          </button>
+        )}
       </div>
     </div>
+  );
+}
+
+// Datos que la persona puede corregir de su entrada: nombre y documento hasta
+// el check-in, teléfono (Congreso) y menú/alergias (Cena de gala). El email
+// no: es su acceso. La imagen de la entrada y el certificado se generan al
+// momento con los datos nuevos.
+function EditarMisDatos({
+  entrada,
+  onCerrar,
+  onGuardado,
+}: {
+  entrada: EntradaPortal;
+  onCerrar: () => void;
+  onGuardado: () => void;
+}) {
+  const ed = entrada.edicion;
+  const bloqueado = ed.checkIn;
+  const [nombre, setNombre] = useState(entrada.nombre ?? "");
+  const [tipoDocumento, setTipoDocumento] = useState("");
+  const [documento, setDocumento] = useState("");
+  const [telefono, setTelefono] = useState(ed.telefono ?? "");
+  const [menu, setMenu] = useState(ed.menu ?? "");
+  const [alergias, setAlergias] = useState(ed.alergias ?? "");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const id = `${entrada.tabla}-${entrada.id}`;
+
+  async function guardar(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const cuerpo: Record<string, string> = { tabla: entrada.tabla, id: entrada.id };
+    if (!bloqueado) {
+      if (!nombreTieneApellidos(nombre)) return setError("Escribe tu nombre y tus apellidos.");
+      cuerpo.nombre = nombre;
+      if (documento.trim()) {
+        if (!esTipoDocumento(tipoDocumento)) return setError("Elige el tipo de documento.");
+        if (!validarDocumento(documento, tipoDocumento)) return setError(AYUDA_DOCUMENTO[tipoDocumento]);
+        cuerpo.tipo_documento = tipoDocumento;
+        cuerpo.documento = documento;
+      }
+    }
+    if (entrada.tabla === "congreso") cuerpo.telefono = telefono;
+    if (entrada.tabla === "gala") {
+      if (!menu) return setError("Elige tu menú.");
+      cuerpo.menu = menu;
+      cuerpo.alergias = alergias;
+    }
+    setGuardando(true);
+    try {
+      const res = await fetch("/api/portal/mis-datos/editar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cuerpo),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) throw new Error("Tu sesión ha caducado. Vuelve a entrar con tu email.");
+      if (!res.ok) throw new Error(data.error || "No se ha podido guardar.");
+      onGuardado();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error inesperado.");
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <form onSubmit={guardar} className="mt-3 flex flex-col gap-3 rounded-md border border-[var(--borde)] bg-zinc-50 p-3">
+      <p className="font-semibold text-zinc-800">Editar mis datos</p>
+      {bloqueado && (
+        <p className="text-zinc-500">Ya no se puede modificar el nombre ni el documento: tu entrada ya está registrada.</p>
+      )}
+      <div>
+        <label className="campo-label" htmlFor={`nombre-${id}`}>Nombre y apellidos</label>
+        <input
+          id={`nombre-${id}`}
+          className="campo-input text-base disabled:bg-zinc-100 disabled:text-zinc-500"
+          maxLength={150}
+          disabled={bloqueado}
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+        />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-[10rem_1fr]">
+        <div>
+          <label className="campo-label" htmlFor={`tipodoc-${id}`}>Documento</label>
+          <select
+            id={`tipodoc-${id}`}
+            className="campo-input text-base disabled:bg-zinc-100"
+            disabled={bloqueado}
+            value={tipoDocumento}
+            onChange={(e) => setTipoDocumento(e.target.value)}
+          >
+            <option value=""></option>
+            {TIPOS_DOCUMENTO.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="campo-label" htmlFor={`doc-${id}`}>Número</label>
+          <input
+            id={`doc-${id}`}
+            className="campo-input text-base disabled:bg-zinc-100"
+            maxLength={30}
+            disabled={bloqueado}
+            value={documento}
+            placeholder={ed.tieneDocumento ? "Ya tienes uno guardado: déjalo vacío para no cambiarlo" : ""}
+            onChange={(e) => setDocumento(e.target.value)}
+          />
+        </div>
+      </div>
+      {entrada.tabla === "congreso" && (
+        <div>
+          <label className="campo-label" htmlFor={`tel-${id}`}>Teléfono</label>
+          <input
+            id={`tel-${id}`}
+            type="tel"
+            className="campo-input text-base"
+            maxLength={40}
+            value={telefono}
+            onChange={(e) => setTelefono(e.target.value)}
+          />
+        </div>
+      )}
+      {entrada.tabla === "gala" && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="campo-label" htmlFor={`menu-${id}`}>Menú</label>
+            <select id={`menu-${id}`} className="campo-input text-base" value={menu} onChange={(e) => setMenu(e.target.value)}>
+              <option value=""></option>
+              {MENUS_GALA.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="campo-label" htmlFor={`alergias-${id}`}>Alergias o intolerancias</label>
+            <input
+              id={`alergias-${id}`}
+              className="campo-input text-base"
+              maxLength={500}
+              value={alergias}
+              onChange={(e) => setAlergias(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+      <p className="text-xs text-zinc-500">Para cambiar tu email, escríbenos a secretaria@balvert.es.</p>
+      {error && <Aviso tipo="error">{error}</Aviso>}
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={guardando}
+          className="min-h-11 rounded-md bg-[var(--balvert-azul-oscuro)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+        >
+          {guardando ? "Guardando…" : "Guardar"}
+        </button>
+        <button type="button" onClick={onCerrar} className="min-h-11 rounded-md border border-[var(--borde)] px-4 py-2 text-sm text-zinc-600">
+          Cancelar
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -290,6 +488,8 @@ function AreaCliente() {
   const [error, setError] = useState<string | null>(null);
   const [saliendo, setSaliendo] = useState(false);
 
+  const [version, setVersion] = useState(0);
+
   useEffect(() => {
     fetch("/api/portal/mis-datos", { cache: "no-store" })
       .then(async (res) => {
@@ -302,7 +502,7 @@ function AreaCliente() {
         setDatos(data);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Error inesperado. Recarga la página."));
-  }, [router]);
+  }, [router, version]);
 
   async function salir() {
     setSaliendo(true);
@@ -411,7 +611,7 @@ function AreaCliente() {
                     </h3>
                     <div className="flex flex-col gap-3">
                       {delGrupo.map((e) => (
-                        <TarjetaEntrada key={e.id} entrada={e} />
+                        <TarjetaEntrada key={e.id} entrada={e} onEditada={() => setVersion((v) => v + 1)} />
                       ))}
                     </div>
                   </div>
