@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { cabeceraAutorizacion, llamarApiGet, llamarApiJson } from "@/lib/apiCliente";
+import ExtrasInvitado from "@/components/ExtrasInvitado";
 import { AYUDA_DOCUMENTO_SIN_TIPO, nombreTieneApellidos, validarDocumentoSinTipo } from "@/lib/documentoIdentidad";
 import {
   AVISO_POR_ENCIMA,
@@ -175,6 +176,20 @@ export default function InvitadosPatrocinador(props: Props) {
     setGuardando(false);
   }
 
+  // Cena / excursión de un invitado ya asignado (Diamante).
+  async function cambiarExtra(cuerpo: Record<string, string>): Promise<string> {
+    const res = await fetch("/api/patrocinadores/invitados", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...(await cabeceraAutorizacion()) },
+      body: JSON.stringify({ patrocinador_id: props.patrocinadorId, ...cuerpo }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "No se pudo guardar.");
+    await cargar();
+    if (cuerpo.accion === "quitar") return "Quitada.";
+    return data.enviado ? "Añadida. Entrada enviada." : `Añadida y entrada generada, pero el email no salió (${data.errorEnvio ?? "error"}): reenvíala desde su ficha.`;
+  }
+
   async function quitar(inv: Invitado) {
     const ok = window.confirm(
       `¿Quitar a ${inv.nombre || inv.email || "este invitado"}? Se borrarán sus filas de Congreso${inv.gala ? ", Cena de gala" : ""}${
@@ -329,6 +344,7 @@ export default function InvitadosPatrocinador(props: Props) {
                   {inv.gala && <Estado entrada={inv.gala} tabla="gala" etiqueta="Cena" />}
                   {inv.excursion && <Estado entrada={inv.excursion} tabla="excursion" etiqueta="Excursión" />}
                 </div>
+                <ExtrasInvitado invitado={inv} resumen={resumen} modo="panel" enviar={cambiarExtra} />
               </div>
               {tieneCheckIn(inv) ? (
                 <span className="text-xs text-zinc-400">Con check-in: no se puede quitar</span>

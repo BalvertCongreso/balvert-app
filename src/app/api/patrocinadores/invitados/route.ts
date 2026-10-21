@@ -2,10 +2,14 @@ import { NextResponse } from "next/server";
 import { crearClienteServidor, usuarioDesdeCabecera } from "@/lib/supabaseServidor";
 import {
   ErrorInvitados,
+  anadirEventoInvitado,
   anadirInvitado,
+  esEventoExtra,
   leerPatrocinador,
   listarInvitados,
+  quitarEventoInvitado,
   quitarInvitado,
+  validarEventoExtra,
   validarNuevoInvitado,
 } from "@/lib/invitadosServidor";
 
@@ -71,6 +75,30 @@ export async function DELETE(req: Request) {
   try {
     await quitarInvitado(p.supabase, p.patrocinador, clave);
     return NextResponse.json({ ok: true });
+  } catch (e) {
+    return respuestaError(e);
+  }
+}
+
+// Cena de gala / excursión de un invitado ya asignado (Diamante):
+// { patrocinador_id, clave, accion: "anadir" | "quitar", evento, menu?, alergias? }.
+// Desde el panel se puede pasar de lo incluido (la pantalla avisa antes).
+export async function PATCH(req: Request) {
+  const body = await req.json().catch(() => null);
+  const p = await preparar(req, typeof body?.patrocinador_id === "string" ? body.patrocinador_id : null);
+  if (p.respuesta) return p.respuesta;
+  const clave = typeof body?.clave === "string" ? body.clave : "";
+  if (!clave) return NextResponse.json({ error: "Falta el invitado." }, { status: 400 });
+  const quitar = body?.accion === "quitar";
+  // Para quitar basta con el evento; para añadir la cena hace falta el menú.
+  const extra = quitar ? (esEventoExtra(body?.evento) ? { evento: body.evento, gala: null } : "Elige cena de gala o excursión.") : validarEventoExtra(body);
+  if (typeof extra === "string") return NextResponse.json({ error: extra }, { status: 400 });
+  try {
+    if (quitar) {
+      await quitarEventoInvitado(p.supabase, p.patrocinador, clave, extra.evento);
+      return NextResponse.json({ ok: true });
+    }
+    return NextResponse.json(await anadirEventoInvitado(p.supabase, p.patrocinador, clave, extra, { limitar: false }));
   } catch (e) {
     return respuestaError(e);
   }

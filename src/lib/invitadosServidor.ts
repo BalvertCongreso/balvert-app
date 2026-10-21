@@ -326,6 +326,100 @@ export async function quitarInvitado(
   return inv;
 }
 
+// ---- Cena y excursión de un invitado ya asignado (solo Diamante) ----
+
+export type EventoExtra = "gala" | "excursion";
+
+export const MENSAJE_EXTRA_ASIGNADO: Record<EventoExtra, string> = {
+  gala: "Ya habéis asignado vuestra invitación a la cena",
+  excursion: "Ya habéis asignado vuestra invitación a la excursión",
+};
+
+export function esEventoExtra(valor: unknown): valor is EventoExtra {
+  return valor === "gala" || valor === "excursion";
+}
+
+// Valida lo que llega del navegador para añadir cena/excursión.
+export function validarEventoExtra(body: unknown): { evento: EventoExtra; gala: { menu: string; alergias: string } | null } | string {
+  const b = (body ?? {}) as Record<string, unknown>;
+  if (b.evento !== "gala" && b.evento !== "excursion") return "Elige cena de gala o excursión.";
+  if (b.evento === "excursion") return { evento: "excursion", gala: null };
+  const menu = typeof b.menu === "string" ? b.menu : "";
+  if (!(MENUS_GALA as readonly string[]).includes(menu)) return "Elige el menú de la cena de gala.";
+  const alergias = typeof b.alergias === "string" ? b.alergias.trim().slice(0, 500) : "";
+  return { evento: "gala", gala: { menu, alergias } };
+}
+
+// Añade la cena o la excursión a un invitado que ya tiene su entrada del
+// Congreso, con los mismos datos, y le envía esa entrada. limitar: desde la
+// zona de empresa no se pasa de lo incluido (1 de cada en Diamante).
+export async function anadirEventoInvitado(
+  supabase: SupabaseClient,
+  patrocinador: PatrocinadorInvitaciones,
+  clave: string,
+  extra: { evento: EventoExtra; gala: { menu: string; alergias: string } | null },
+  opciones: { limitar: boolean; autor?: string }
+): Promise<ResultadoAlta> {
+  if (patrocinador.categoria !== CATEGORIA_DIAMANTE) {
+    throw new ErrorInvitados("La cena de gala y la excursión solo se incluyen en el patrocinio Diamante.");
+  }
+  const resumen = await listarInvitados(supabase, patrocinador);
+  const inv = resumen.invitados.find((i) => i.clave === clave);
+  if (!inv || !inv.congreso || !inv.email) throw new ErrorInvitados("Ese invitado ya no está en la lista.", 404);
+  if (inv[extra.evento]) {
+    throw new ErrorInvitados(extra.evento === "gala" ? "Este invitado ya tiene la cena de gala." : "Este invitado ya tiene la excursión.");
+  }
+  if (opciones.limitar && resumen.asignadas[extra.evento] >= resumen.incluidas[extra.evento]) {
+    throw new ErrorInvitados(MENSAJE_EXTRA_ASIGNADO[extra.evento]);
+  }
+
+  const { data: congreso } = await supabase
+    .from("asistentes_congreso")
+    .select("nombre, email, documento_identidad")
+    .eq("id", inv.congreso.id)
+    .single();
+  const fila: Fila = {
+    edicion_id: patrocinador.edicion_id,
+    empresa_entidad: patrocinador.id,
+    categoria_patrocinio: patrocinador.categoria,
+    nombre_asistente: congreso?.nombre ?? inv.nombre,
+    email_asistente: congreso?.email ?? inv.email,
+    documento_identidad: congreso?.documento_identidad ?? null,
+    tipo_entrada: TIPO_ENTRADA_INCLUIDA,
+    confirmado: "Pendiente",
+    entrada_enviada: "No",
+    qr_codigo: randomUUID(),
+    ...(extra.gala ? { menu: extra.gala.menu, alergias_intolerancias: extra.gala.alergias || null } : {}),
+  };
+  let creada: Fila;
+  try {
+    creada = await insertarFila(supabase, TABLA_SQL[extra.evento], fila, opciones.autor);
+  } catch (e) {
+    throw new Error(`No se pudo guardar (${extra.evento}): ${e instanceof Error ? e.message : e}`);
+  }
+  const envio = await enviarEntradas(supabase, patrocinador, inv.email, [{ tabla: extra.evento, fila: creada }], opciones.autor);
+  return { clave, enviado: envio.enviado, errorEnvio: envio.error };
+}
+
+// Quita solo la cena o la excursión de un invitado (su entrada de ese evento
+// deja de valer). No si ya hizo el check-in de ese evento.
+export async function quitarEventoInvitado(
+  supabase: SupabaseClient,
+  patrocinador: PatrocinadorInvitaciones,
+  clave: string,
+  evento: EventoExtra,
+  autor?: string
+) {
+  if (patrocinador.categoria !== CATEGORIA_DIAMANTE) {
+    throw new ErrorInvitados("La cena de gala y la excursión solo se incluyen en el patrocinio Diamante.");
+  }
+  const { invitados } = await listarInvitados(supabase, patrocinador);
+  const entrada = invitados.find((i) => i.clave === clave)?.[evento];
+  if (!entrada) throw new ErrorInvitados("Este invitado no la tiene.", 404);
+  if (entrada.checkIn) throw new ErrorInvitados("No se puede quitar: ya ha hecho el check-in.");
+  await borrarFila(supabase, TABLA_SQL[evento], entrada.id, autor);
+}
+
 const TABLA_SQL: Record<Tabla, string> = { congreso: "asistentes_congreso", gala: "gala", excursion: "excursion" };
 
 export const MENSAJE_LIMITE =

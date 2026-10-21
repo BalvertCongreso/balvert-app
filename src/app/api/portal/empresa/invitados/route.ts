@@ -4,10 +4,14 @@ import { idEdicionActiva } from "@/lib/portal";
 import { autorEmpresa, claveAcciones, sesionEmpresa, type SesionEmpresa } from "@/lib/portalEmpresa";
 import {
   ErrorInvitados,
+  anadirEventoInvitado,
   anadirInvitado,
+  esEventoExtra,
   leerPatrocinador,
   listarInvitados,
+  quitarEventoInvitado,
   quitarInvitado,
+  validarEventoExtra,
   validarNuevoInvitado,
 } from "@/lib/invitadosServidor";
 import { LIMITE_CAMBIOS_POR_HORA, MENSAJE_LIMITE, accionesUltimaHora, registrarAccion } from "@/lib/portalMateriales";
@@ -84,6 +88,34 @@ export async function DELETE(req: Request) {
     await quitarInvitado(p.supabase, p.patrocinador, clave, autorEmpresa(p.sesion));
     await registrarAccion(p.supabase, claveAcciones(p.sesion), "invitado", "baja").catch(() => null);
     return NextResponse.json({ ok: true });
+  } catch (e) {
+    return respuestaError(e);
+  }
+}
+
+// Cena de gala / excursión de un invitado ya asignado (Diamante), solo hasta
+// lo incluido: { clave, accion: "anadir" | "quitar", evento, menu?, alergias? }.
+export async function PATCH(req: Request) {
+  const p = await preparar();
+  if (p.respuesta) return p.respuesta;
+  const body = await req.json().catch(() => null);
+  const clave = typeof body?.clave === "string" ? body.clave : "";
+  if (!clave) return NextResponse.json({ error: "Falta el invitado." }, { status: 400 });
+  const quitar = body?.accion === "quitar";
+  // Para quitar basta con el evento; para añadir la cena hace falta el menú.
+  const extra = quitar ? (esEventoExtra(body?.evento) ? { evento: body.evento, gala: null } : "Elige cena de gala o excursión.") : validarEventoExtra(body);
+  if (typeof extra === "string") return NextResponse.json({ error: extra }, { status: 400 });
+  if (await limiteAlcanzado(p.supabase, p.sesion)) return NextResponse.json({ error: MENSAJE_LIMITE }, { status: 429 });
+  const autor = autorEmpresa(p.sesion);
+  try {
+    if (quitar) {
+      await quitarEventoInvitado(p.supabase, p.patrocinador, clave, extra.evento, autor);
+      await registrarAccion(p.supabase, claveAcciones(p.sesion), "invitado", `quitar_${extra.evento}`).catch(() => null);
+      return NextResponse.json({ ok: true });
+    }
+    const resultado = await anadirEventoInvitado(p.supabase, p.patrocinador, clave, extra, { limitar: true, autor });
+    await registrarAccion(p.supabase, claveAcciones(p.sesion), "invitado", `anadir_${extra.evento}`).catch(() => null);
+    return NextResponse.json(resultado);
   } catch (e) {
     return respuestaError(e);
   }

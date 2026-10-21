@@ -103,16 +103,20 @@ export async function listarClientes(supabase: SupabaseClient, edicionId: string
         (doc.length >= 4 && f.documento && normalizarDocumento(f.documento).includes(doc))
     );
   const elegidos = [...porEmail.entries()].filter(([, lista]) => coincide(lista));
-  const emails = elegidos.map(([e]) => e);
 
-  const referencias = [...new Set(filas.map((f) => f.entrada.referencia).filter((r): r is string => !!r))];
+  // Últimos accesos y facturas pedidas: las dos tablas enteras, por bloques, y
+  // se cruzan aquí. Con .in() sobre todos los emails o referencias la petición
+  // se hace demasiado larga en cuanto hay unos cientos de ventas.
   const [accesos, facturas] = await Promise.all([
-    emails.length ? supabase.from("clientes_accesos").select("email, ultimo_acceso").in("email", emails) : { data: [] },
-    referencias.length
-      ? supabase.from("solicitudes_factura").select("email, referencia_pago_online").in("referencia_pago_online", referencias)
-      : { data: [] },
+    obtenerTodasLasFilas<{ email: string; ultimo_acceso: string }>((desde, hasta) =>
+      supabase.from("clientes_accesos").select("email, ultimo_acceso").order("email").range(desde, hasta)
+    ),
+    obtenerTodasLasFilas<{ referencia_pago_online: string }>((desde, hasta) =>
+      supabase.from("solicitudes_factura").select("referencia_pago_online").order("referencia_pago_online").range(desde, hasta)
+    ),
   ]);
-  const conFactura = new Set((facturas.data ?? []).map((f) => f.referencia_pago_online as string));
+  const ultimoAcceso = new Map(accesos.map((a) => [a.email.toLowerCase(), a.ultimo_acceso]));
+  const conFactura = new Set(facturas.map((f) => f.referencia_pago_online));
 
   return elegidos
     .map(([email, lista]): Cliente => {
@@ -124,7 +128,7 @@ export async function listarClientes(supabase: SupabaseClient, edicionId: string
         compras: refs.size,
         facturaPedida: [...refs].some((r) => conFactura.has(r)),
         certificado: lista.some((f) => f.entrada.tabla === "congreso" && f.entrada.checkIn && !!f.entrada.nombre),
-        ultimoAcceso: ((accesos.data ?? []).find((a) => a.email === email)?.ultimo_acceso as string | undefined) ?? null,
+        ultimoAcceso: ultimoAcceso.get(email) ?? null,
       };
     })
     .sort((a, b) => (a.nombres[0] ?? a.email).localeCompare(b.nombres[0] ?? b.email, "es"));

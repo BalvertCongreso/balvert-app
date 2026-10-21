@@ -14,6 +14,7 @@ import {
   type ResumenInvitados,
 } from "@/lib/invitados";
 import { CAMPOS_CONTACTO, CAMPOS_FACTURACION_EMPRESA, type CampoEmpresa } from "@/lib/datosEmpresa";
+import ExtrasInvitado from "@/components/ExtrasInvitado";
 
 // Pestañas «Invitaciones» y «Datos de la empresa» de la zona de empresa. Las
 // rutas (/api/portal/empresa/*) deciden la empresa con la sesión y validan
@@ -111,6 +112,20 @@ export function InvitacionesEmpresa() {
       setError(err instanceof Error ? err.message : "Error inesperado.");
     }
     setGuardando(false);
+  }
+
+  // Cena / excursión de un invitado ya asignado (Diamante, solo hasta lo incluido).
+  async function cambiarExtra(cuerpo: Record<string, string>): Promise<string> {
+    const r = await pedir("/api/portal/empresa/invitados", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cuerpo),
+    });
+    await cargar();
+    if (cuerpo.accion === "quitar") return "Quitada. La invitación vuelve a estar libre para otra persona.";
+    return r.enviado
+      ? "Añadida. Le hemos enviado su entrada."
+      : "Añadida y entrada generada, pero ahora no hemos podido enviarle el email. Puedes descargarla aquí y dársela.";
   }
 
   async function quitar(inv: Invitado) {
@@ -229,6 +244,7 @@ export function InvitacionesEmpresa() {
                     inv[tabla] ? <EntradaFila key={tabla} tabla={tabla} titulo={titulo} entrada={inv[tabla]!} /> : null
                   )}
                 </div>
+                <ExtrasInvitado invitado={inv} resumen={resumen} modo="empresa" enviar={cambiarExtra} />
               </div>
               {tieneCheckIn(inv) ? (
                 <span className="text-xs text-zinc-400">Ya ha hecho el check-in</span>
