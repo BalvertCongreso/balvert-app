@@ -6,15 +6,15 @@ import { normalizarEmail, type SucesoEmail } from "@/lib/exclusiones";
 import type { Hoja } from "@/lib/leerHojaCalculo";
 import type { MotivoExclusion } from "@/types/database";
 
-const RE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const RE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function cabecera(texto: string): string {
+export function cabecera(texto: string): string {
   return normalizarTexto(texto).replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 // «Email», «E-mail», «Correo», «Correo electrónico», «Dirección de correo»…
 // pero no «Id Mailrelay» ni «Estado en Mailrelay».
-function esCabeceraEmail(texto: string): boolean {
+export function esCabeceraEmail(texto: string): boolean {
   const c = cabecera(texto);
   return /^(e ?mail|correo|mail)( electronico)?( address)?$/.test(c) || /^direccion (de )?(e ?mail|correo)/.test(c);
 }
@@ -53,28 +53,23 @@ export interface ArchivoAnalizado {
   invalidas: number;
 }
 
-function contarEmails(filas: string[][]): number {
+export function contarEmails(filas: string[][]): number {
   let n = 0;
   for (const f of filas) for (const v of f) if (RE_EMAIL.test(v.trim())) n++;
   return n;
 }
 
-export function analizarArchivo(hojas: Hoja[]): ArchivoAnalizado {
-  // La hoja con más emails (p. ej. un Excel con una hoja «Léeme» delante).
-  const hoja = [...hojas].sort((a, b) => contarEmails(b.filas) - contarEmails(a.filas))[0];
-  if (!hoja || contarEmails(hoja.filas) === 0) {
-    throw new Error("No se ha encontrado ningún email en el archivo.");
-  }
-
-  // Fila de cabecera: la primera (de las 30 primeras) con una columna de
-  // email reconocible; si no la hay, la fila anterior al primer email.
-  let iCabecera = hoja.filas.slice(0, 30).findIndex((f) => f.some(esCabeceraEmail));
-  let iEmail = iCabecera >= 0 ? hoja.filas[iCabecera].findIndex(esCabeceraEmail) : -1;
+// Fila de cabecera: la primera (de las 30 primeras) con una columna de email
+// reconocible; si no la hay, la fila anterior al primer email, y como columna
+// de email la que más emails tiene.
+export function detectarCabecera(filas: string[][]): { iCabecera: number; iEmail: number } {
+  let iCabecera = filas.slice(0, 30).findIndex((f) => f.some(esCabeceraEmail));
+  let iEmail = iCabecera >= 0 ? filas[iCabecera].findIndex(esCabeceraEmail) : -1;
   if (iCabecera < 0) {
-    const primera = hoja.filas.findIndex((f) => f.some((v) => RE_EMAIL.test(v.trim())));
+    const primera = filas.findIndex((f) => f.some((v) => RE_EMAIL.test(v.trim())));
     iCabecera = primera - 1;
-    const filasDatos = hoja.filas.slice(primera);
-    const anchura = Math.max(...filasDatos.map((f) => f.length));
+    const filasDatos = primera >= 0 ? filas.slice(primera) : [];
+    const anchura = Math.max(0, ...filasDatos.map((f) => f.length));
     let mejor = 0;
     for (let i = 0; i < anchura; i++) {
       const n = filasDatos.filter((f) => RE_EMAIL.test((f[i] ?? "").trim())).length;
@@ -84,6 +79,17 @@ export function analizarArchivo(hojas: Hoja[]): ArchivoAnalizado {
       }
     }
   }
+  return { iCabecera, iEmail };
+}
+
+export function analizarArchivo(hojas: Hoja[]): ArchivoAnalizado {
+  // La hoja con más emails (p. ej. un Excel con una hoja «Léeme» delante).
+  const hoja = [...hojas].sort((a, b) => contarEmails(b.filas) - contarEmails(a.filas))[0];
+  if (!hoja || contarEmails(hoja.filas) === 0) {
+    throw new Error("No se ha encontrado ningún email en el archivo.");
+  }
+
+  const { iCabecera, iEmail } = detectarCabecera(hoja.filas);
 
   const cabeceras = iCabecera >= 0 ? hoja.filas[iCabecera] : [];
   const iCategoria = cabeceras.findIndex((c, i) => i !== iEmail && esCabeceraCategoria(c) && !esCabeceraSigue(c));

@@ -260,6 +260,12 @@ export default function ContactosPage() {
             Actualizar rebotes y bajas desde Mailrelay
           </button>
           <Link
+            href="/contactos/importar"
+            className="rounded-md border border-[var(--borde)] bg-white px-4 py-2 text-sm font-semibold text-[var(--balvert-azul-oscuro)] hover:bg-zinc-50"
+          >
+            Importar contactos
+          </Link>
+          <Link
             href="/contactos/importar-exclusiones"
             className="rounded-md border border-[var(--borde)] bg-white px-4 py-2 text-sm font-semibold text-[var(--balvert-azul-oscuro)] hover:bg-zinc-50"
           >
