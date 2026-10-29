@@ -160,6 +160,10 @@ export async function crearCampana(params: {
 export interface CampanaEnviada {
   id: number;
   subject?: string;
+  scheduled_at?: string | null;
+  created_at?: string;
+  finished_at?: string | null;
+  unsubscribe_events_count?: number;
   // "pending" | "processing" | "finished" | "paused" | "cancelled" | "inactive"
   status?: string;
   sent_emails_count?: number;
@@ -200,4 +204,51 @@ export async function enviarCampanaDePrueba(
     method: "POST",
     body: { test_emails: emails.join(",") },
   });
+}
+
+// Listados paginados (page empieza en 1). Se para cuando una página llega
+// incompleta. Documentación: GET /sent_campaigns (máx. 100 por página) y
+// GET /sent_campaigns/{id}/sent_emails y /unsubscribe_events (máx. 10000).
+async function listarTodo<T>(path: string, porPagina: number): Promise<T[]> {
+  const todos: T[] = [];
+  const separador = path.includes("?") ? "&" : "?";
+  for (let pagina = 1; ; pagina++) {
+    const datos = await llamar<T[]>(`${path}${separador}page=${pagina}&per_page=${porPagina}`, {
+      reintentos: 2,
+    });
+    const filas = Array.isArray(datos) ? datos : [];
+    todos.push(...filas);
+    if (filas.length < porPagina) break;
+  }
+  return todos;
+}
+
+// Todas las campañas enviadas de la cuenta, también las mandadas desde el
+// panel de Mailrelay (comprobado el 29/10/2026: sale el boletín del 15/09).
+export async function listarCampanasEnviadas(): Promise<CampanaEnviada[]> {
+  return listarTodo<CampanaEnviada>("/sent_campaigns", 100);
+}
+
+// Un destinatario de una campaña enviada. `status` es "delivered",
+// "bounced" (rebote normal) o "soft_bounced" (rebote temporal), entre otros;
+// lo confirman `bounced_at` / `soft_bounced_at` (visto en la cuenta real).
+export interface EmailEnviado {
+  email: string;
+  status?: string;
+  bounced_at?: string | null;
+  soft_bounced_at?: string | null;
+  bounce_category?: string | null;
+}
+
+export async function listarEmailsEnviados(sentCampaignId: number): Promise<EmailEnviado[]> {
+  return listarTodo<EmailEnviado>(`/sent_campaigns/${sentCampaignId}/sent_emails`, 10000);
+}
+
+export interface BajaCampana {
+  email: string;
+  created_at?: string;
+}
+
+export async function listarBajasCampana(sentCampaignId: number): Promise<BajaCampana[]> {
+  return listarTodo<BajaCampana>(`/sent_campaigns/${sentCampaignId}/unsubscribe_events`, 10000);
 }

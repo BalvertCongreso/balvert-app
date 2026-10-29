@@ -257,9 +257,44 @@ export interface ContactoNewsletter {
   nombre_colegio: string | null;
   nacionalidad: string | null;
   fecha_alta: string;
+  // «Excluido de envíos»: no entra en ningún boletín (ver migración 034).
+  estado: EstadoContacto;
+  motivo_exclusion: MotivoExclusion | null;
+  fecha_exclusion: string | null;
+  rebotes_temporales: number;
+  fecha_ultimo_rebote_temporal: string | null;
 }
 
-export type ContactoNewsletterInput = Omit<ContactoNewsletter, "id" | "fecha_alta">;
+export type EstadoContacto = "Activo" | "Excluido";
+export type MotivoExclusion = "Rebote" | "Baja" | "Manual";
+export type ResultadoBoletin = "Enviado" | "Rebote" | "Rebote temporal" | "Baja";
+
+// Lo que se edita en el formulario: el estado solo cambia con las acciones de
+// excluir / volver a activar, nunca al guardar los datos.
+export type ContactoNewsletterInput = Omit<
+  ContactoNewsletter,
+  "id" | "fecha_alta" | "estado" | "motivo_exclusion" | "fecha_exclusion" | "rebotes_temporales" | "fecha_ultimo_rebote_temporal"
+>;
+
+export interface Boletin {
+  id: string;
+  mailrelay_campaign_id: number | null;
+  mailrelay_sent_campaign_id: number | null;
+  asunto: string | null;
+  fecha_envio: string;
+  origen_lista: string;
+  destinatarios: number;
+  enviado_desde: "App" | "Mailrelay";
+  creado: string;
+}
+
+export interface ContactoBoletin {
+  id: string;
+  contacto_id: string;
+  boletin_id: string;
+  fecha: string;
+  resultado: ResultadoBoletin;
+}
 
 export interface Tarea {
   id: string;

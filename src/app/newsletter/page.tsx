@@ -134,9 +134,11 @@ export default function NewsletterPage() {
   }, []);
 
   useEffect(() => {
+    // Solo los contactos Activos: los «Excluidos de envíos» no reciben nunca.
     let query = supabase
       .from("contactos_newsletter")
-      .select("id", { count: "exact", head: true });
+      .select("id", { count: "exact", head: true })
+      .eq("estado", "Activo");
     if (origenFiltro) query = query.eq("origen_lista", origenFiltro);
     query.then(({ count }) => setTotalDestinatarios(count ?? 0));
   }, [origenFiltro]);
@@ -150,6 +152,7 @@ export default function NewsletterPage() {
       let query = supabase
         .from("contactos_newsletter")
         .select("email, nombre, apellidos")
+        .eq("estado", "Activo")
         .order("id", { ascending: true })
         .range(desde, hasta);
       if (origenFiltro) query = query.eq("origen_lista", origenFiltro);
@@ -244,6 +247,7 @@ export default function NewsletterPage() {
       setEstado("sincronizando");
       setProgreso({ actual: 0, total: contactos.length });
       const erroresSincronizacion: string[] = [];
+      let sincronizados = 0;
       for (let i = 0; i < contactos.length; i += TAMANO_LOTE) {
         const lote = contactos.slice(i, i + TAMANO_LOTE);
         const resultado: { sincronizados: number; errores: string[] } = await llamarApiJson(
@@ -251,6 +255,7 @@ export default function NewsletterPage() {
           { groupId, contactos: lote }
         );
         if (Array.isArray(resultado.errores)) erroresSincronizacion.push(...resultado.errores);
+        sincronizados += resultado.sincronizados ?? 0;
         setProgreso({ actual: Math.min(i + TAMANO_LOTE, contactos.length), total: contactos.length });
       }
 
@@ -275,17 +280,22 @@ export default function NewsletterPage() {
         groupId,
       });
       const scheduledAtUtc = programarEnvio ? localAUtcMailrelay(fechaProgramada) : undefined;
-      await llamarApiJson(`/api/newsletter/campana/${campaignId}/enviar`, {
-        scheduledAtUtc,
-        asunto,
-        totalContactos: contactos.length,
-      });
+      const respuesta: { avisoHistorico?: string } = await llamarApiJson(
+        `/api/newsletter/campana/${campaignId}/enviar`,
+        {
+          scheduledAtUtc,
+          asunto,
+          totalContactos: sincronizados,
+          origen: origenFiltro || null,
+        }
+      );
 
       setEstado("hecho");
       setMensaje(
-        programarEnvio
-          ? `Newsletter programada para ${contactos.length} contacto(s) el ${formatearFechaLocal(fechaProgramada)}.`
-          : `Newsletter enviada a ${contactos.length} contacto(s).`
+        (programarEnvio
+          ? `Newsletter programada para ${sincronizados} contacto(s) el ${formatearFechaLocal(fechaProgramada)}.`
+          : `Newsletter enviada a ${sincronizados} contacto(s).`) +
+          (respuesta.avisoHistorico ? ` ${respuesta.avisoHistorico}` : "")
       );
       setConfirmacion("");
       setProgramarEnvio(false);
@@ -371,7 +381,9 @@ export default function NewsletterPage() {
               ))}
             </select>
             <p className="mt-1 text-xs text-zinc-400">
-              {totalDestinatarios === null ? "Calculando…" : `${totalDestinatarios} destinatario(s)`}
+              {totalDestinatarios === null
+                ? "Calculando…"
+                : `${totalDestinatarios} destinatario(s). Los excluidos de envíos no cuentan.`}
             </p>
           </div>
           <div>

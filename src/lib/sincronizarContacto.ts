@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabaseClient";
+import { normalizarEmail } from "@/lib/exclusiones";
 import type { ProspectoPatrocinioInput } from "@/types/database";
 
 const INTERESES_QUE_SINCRONIZAN = ["Interesado", "En negociación", "Convertido en patrocinador"];
@@ -6,15 +7,18 @@ const INTERESES_QUE_SINCRONIZAN = ["Interesado", "En negociación", "Convertido 
 // Copia un prospecto de Captación a Contactos cuando su interés indica que
 // merece la pena tenerlo en la lista de newsletter. Si el interés retrocede
 // (Sin contactar / Contactado / No interesado), no se toca ni se borra la
-// ficha ya creada en Contactos.
+// ficha ya creada en Contactos. Si el email ya está en Contactos (también si
+// está «Excluido de envíos») solo se actualizan sus datos: el estado no se
+// toca nunca desde aquí.
 export async function sincronizarContactoDesdeProspecto(datos: ProspectoPatrocinioInput) {
   if (!datos.interes || !INTERESES_QUE_SINCRONIZAN.includes(datos.interes)) return;
-  if (!datos.contacto_email) return;
+  const email = normalizarEmail(datos.contacto_email);
+  if (!email) return;
 
   const { data: existente, error: errorBusqueda } = await supabase
     .from("contactos_newsletter")
     .select("id")
-    .eq("email", datos.contacto_email)
+    .eq("email", email)
     .maybeSingle();
 
   if (errorBusqueda) return;
@@ -34,7 +38,7 @@ export async function sincronizarContactoDesdeProspecto(datos: ProspectoPatrocin
   } else {
     await supabase.from("contactos_newsletter").insert({
       ...camposComunes,
-      email: datos.contacto_email,
+      email,
       origen_lista: "Captación de patrocinio",
     });
   }
